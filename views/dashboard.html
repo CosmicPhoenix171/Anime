@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Anime Tracker</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <h1>🎌 Anime Tracker</h1>
+      </div>
+      <div class="nav-links">
+        <span id="userName"></span>
+        <a href="/dashboard">Dashboard</a>
+        <button id="logoutBtn" class="btn-secondary">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section class="dashboard-header">
+      <h2>Your Anime Dashboard</h2>
+      <div class="stats-container" id="statsContainer">
+        <div class="stat-card">
+          <div class="stat-number" id="watchingCount">0</div>
+          <div class="stat-label">Watching</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="completedCount">0</div>
+          <div class="stat-label">Completed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="totalEpisodes">0</div>
+          <div class="stat-label">Episodes Watched</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tabs">
+      <button class="tab-btn active" data-tab="seasonal">Seasonal Anime</button>
+      <button class="tab-btn" data-tab="myProgress">My Progress</button>
+      <button class="tab-btn" data-tab="dubTracker">Dub Tracker</button>
+    </section>
+
+    <section class="tab-content active" id="seasonal">
+      <div class="filter-bar">
+        <select id="seasonFilter">
+          <option value="">All Seasons</option>
+          <option value="winter">Winter</option>
+          <option value="spring">Spring</option>
+          <option value="summer">Summer</option>
+          <option value="fall">Fall</option>
+        </select>
+        <select id="statusFilter">
+          <option value="">All Status</option>
+          <option value="true">Currently Airing</option>
+          <option value="false">Finished</option>
+        </select>
+        <button id="refreshBtn" class="btn-secondary">Refresh</button>
+      </div>
+      <div id="animeGrid" class="anime-grid">
+        <div class="loading">Loading anime...</div>
+      </div>
+    </section>
+
+    <section class="tab-content" id="myProgress">
+      <div id="progressGrid" class="progress-grid">
+        <div class="loading">Loading your progress...</div>
+      </div>
+    </section>
+
+    <section class="tab-content" id="dubTracker">
+      <div class="filter-bar">
+        <button id="dubFilterBtn" class="btn-primary">Show Only Dubbed</button>
+      </div>
+      <div id="dubGrid" class="anime-grid">
+        <div class="loading">Loading dub information...</div>
+      </div>
+    </section>
+  </main>
+
+  <div id="animeModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

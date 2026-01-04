@@ -46,14 +46,17 @@ app.use('/api/anime', animeRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Views directory
+const viewsDir = path.join(__dirname, '../views');
+
 // Serve HTML pages
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../views/index.html'));
+  res.sendFile('index.html', { root: viewsDir });
 });
 
 app.get('/dashboard', (req, res) => {
   if (req.isAuthenticated()) {
-    res.sendFile(path.join(__dirname, '../views/dashboard.html'));
+    res.sendFile('dashboard.html', { root: viewsDir });
   } else {
     res.redirect('/');
   }
@@ -61,20 +64,20 @@ app.get('/dashboard', (req, res) => {
 
 // Additional pages
 app.get('/anime/:id', (req, res) => {
-  res.sendFile(path.join(__dirname, '../views/anime-detail.html'));
+  res.sendFile('anime-detail.html', { root: viewsDir });
 });
 
 app.get('/dub-radar', (req, res) => {
-  res.sendFile(path.join(__dirname, '../views/dub-radar.html'));
+  res.sendFile('dub-radar.html', { root: viewsDir });
 });
 
 app.get('/recently-finished', (req, res) => {
-  res.sendFile(path.join(__dirname, '../views/recently-finished.html'));
+  res.sendFile('recently-finished.html', { root: viewsDir });
 });
 
 app.get('/my-list', (req, res) => {
   if (req.isAuthenticated()) {
-    res.sendFile(path.join(__dirname, '../views/my-list.html'));
+    res.sendFile('my-list.html', { root: viewsDir });
   } else {
     res.redirect('/');
   }
@@ -82,7 +85,7 @@ app.get('/my-list', (req, res) => {
 
 app.get('/my-season', (req, res) => {
   if (req.isAuthenticated()) {
-    res.sendFile(path.join(__dirname, '../views/my-season.html'));
+    res.sendFile('my-season.html', { root: viewsDir });
   } else {
     res.redirect('/');
   }
@@ -90,7 +93,7 @@ app.get('/my-season', (req, res) => {
 
 app.get('/admin', (req, res) => {
   if (req.isAuthenticated()) {
-    res.sendFile(path.join(__dirname, '../views/admin.html'));
+    res.sendFile('admin.html', { root: viewsDir });
   } else {
     res.redirect('/');
   }

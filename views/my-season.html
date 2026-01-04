@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Season - Anime Tracker</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <a href="/"><h1>🎌 Anime Tracker</h1></a>
+      </div>
+      <div class="nav-links">
+        <a href="/">Current Season</a>
+        <a href="/recently-finished">Recently Finished</a>
+        <a href="/dub-radar">Dub Radar</a>
+        <div class="nav-user" id="navUser"></div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="page-header">
+      <h1>🗓️ My Season Dashboard</h1>
+      <div class="season-selector">
+        <button id="prevSeason" class="btn-icon">←</button>
+        <span id="seasonTitle">Winter 2026</span>
+        <button id="nextSeason" class="btn-icon">→</button>
+      </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <section class="stats-grid" id="statsGrid">
+      <div class="stat-card">
+        <div class="stat-number" id="statCompleted">0</div>
+        <div class="stat-label">Completed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="statEpisodes">0</div>
+        <div class="stat-label">Episodes Watched</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="statWatching">0</div>
+        <div class="stat-label">Currently Watching</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="statPlanned">0</div>
+        <div class="stat-label">Planned</div>
+      </div>
+    </section>
+
+    <!-- Behind Alert -->
+    <section class="behind-section" id="behindSection" style="display: none;">
+      <h2>⚠️ You're Behind On</h2>
+      <div class="behind-grid" id="behindGrid"></div>
+    </section>
+
+    <!-- Currently Watching -->
+    <section class="dashboard-section">
+      <h2>📺 Currently Watching</h2>
+      <div class="anime-grid" id="watchingGrid">
+        <div class="loading">Loading...</div>
+      </div>
+    </section>
+
+    <!-- Completed This Season -->
+    <section class="dashboard-section">
+      <h2>✅ Completed This Season</h2>
+      <div class="anime-grid" id="finishedGrid">
+        <div class="empty-state">Nothing completed yet</div>
+      </div>
+    </section>
+
+    <!-- Planned -->
+    <section class="dashboard-section">
+      <h2>📝 Planned to Watch</h2>
+      <div class="anime-grid" id="plannedGrid">
+        <div class="empty-state">Nothing planned</div>
+      </div>
+    </section>
+
+    <!-- Session Activity -->
+    <section class="dashboard-section">
+      <h2>📊 Recent Activity</h2>
+      <div id="activitySection">
+        <div class="loading">Loading activity...</div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Anime Tracker. Powered by AniList API</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      let currentUser = null;
+      let currentSeason = null;
+      let currentYear = null;
+
+      const seasons = ['WINTER', 'SPRING', 'SUMMER', 'FALL'];
+      const seasonNames = { WINTER: 'Winter', SPRING: 'Spring', SUMMER: 'Summer', FALL: 'Fall' };
+
+      // Auth check
+      try {
+        const authRes = await fetch('/auth/status');
+        const authData = await authRes.json();
+        if (!authData.authenticated) {
+          window.location.href = '/';
+          return;
+        }
+        currentUser = authData.user;
+        document.getElementById('navUser').innerHTML = `
+          <div class="user-menu">
+            <img src="${currentUser.picture || ''}" alt="${currentUser.name}" class="user-avatar">
+            <div class="user-dropdown">
+              <a href="/dashboard">Dashboard</a>
+              <a href="/my-list">My List</a>
+              <a href="/my-season" class="active">My Season</a>
+              <a href="/auth/logout">Logout</a>
+            </div>
+          </div>
+        `;
+      } catch (e) {
+        window.location.href = '/';
+        return;
+      }
+
+      // Get current season
+      try {
+        const seasonRes = await fetch('/api/season-info');
+        const seasonData = await seasonRes.json();
+        currentSeason = seasonData.currentSeason;
+        currentYear = seasonData.currentYear;
+      } catch (e) {
+        currentSeason = 'WINTER';
+        currentYear = 2026;
+      }
+
+      updateSeasonDisplay();
+      await loadDashboard();
+
+      function updateSeasonDisplay() {
+        document.getElementById('seasonTitle').textContent = 
+          `${seasonNames[currentSeason]} ${currentYear}`;
+      }
+
+      // Season navigation
+      document.getElementById('prevSeason').addEventListener('click', () => {
+        const idx = seasons.indexOf(currentSeason);
+        if (idx === 0) {
+          currentSeason = seasons[3];
+          currentYear--;
+        } else {
+          currentSeason = seasons[idx - 1];
+        }
+        updateSeasonDisplay();
+        loadDashboard();
+      });
+
+      document.getElementById('nextSeason').addEventListener('click', () => {
+        const idx = seasons.indexOf(currentSeason);
+        if (idx === 3) {
+          currentSeason = seasons[0];
+          currentYear++;
+        } else {
+          currentSeason = seasons[idx + 1];
+        }
+        updateSeasonDisplay();
+        loadDashboard();
+      });
+
+      async function loadDashboard() {
+        try {
+          const response = await fetch(`/api/user/my-season?season=${currentSeason}&year=${currentYear}`);
+          const data = await response.json();
+          renderDashboard(data);
+          loadActivity();
+        } catch (error) {
+          console.error('Error loading dashboard:', error);
+        }
+      }
+
+      function renderDashboard(data) {
+        // Stats
+        document.getElementById('statCompleted').textContent = data.stats.animeCompleted;
+        document.getElementById('statEpisodes').textContent = data.stats.totalEpisodes;
+        document.getElementById('statWatching').textContent = data.stats.currentlyWatching;
+        document.getElementById('statPlanned').textContent = data.stats.plannedCount;
+
+        // Behind section
+        const behindSection = document.getElementById('behindSection');
+        const behindGrid = document.getElementById('behindGrid');
+        if (data.behindOn && data.behindOn.length > 0) {
+          behindSection.style.display = 'block';
+          behindGrid.innerHTML = data.behindOn.map(a => `
+            <a href="/anime/${a.id}" class="behind-card">
+              <img src="${a.poster_url || ''}" alt="${a.title}">
+              <div class="behind-info">
+                <span class="behind-title">${a.title_english || a.title}</span>
+                <span class="behind-count">${a.episodes_behind} episodes behind</span>
+              </div>
+            </a>
+          `).join('');
+        } else {
+          behindSection.style.display = 'none';
+        }
+
+        // Watching
+        renderGrid('watchingGrid', data.watching);
+        
+        // Finished
+        renderGrid('finishedGrid', data.finished);
+        
+        // Planned
+        renderGrid('plannedGrid', data.planned);
+      }
+
+      function renderGrid(gridId, anime) {
+        const grid = document.getElementById(gridId);
+        if (!anime || anime.length === 0) {
+          grid.innerHTML = '<div class="empty-state">Nothing here yet</div>';
+          return;
+        }
+
+        grid.innerHTML = anime.map(a => {
+          const title = a.title_english || a.title;
+          const progress = a.last_episode || 0;
+          const total = a.total_episodes || '?';
+          
+          return `
+            <a href="/anime/${a.id}" class="anime-card compact">
+              <div class="anime-card-image">
+                <img src="${a.poster_url || ''}" alt="${title}" loading="lazy">
+              </div>
+              <div class="anime-card-body">
+                <div class="anime-card-title">${title}</div>
+                <div class="anime-card-info">EP ${progress}/${total}</div>
+              </div>
+            </a>
+          `;
+        }).join('');
+      }
+
+      async function loadActivity() {
+        const container = document.getElementById('activitySection');
+        try {
+          const response = await fetch('/api/user/sessions?limit=20');
+          const sessions = await response.json();
+
+          if (sessions.length === 0) {
+            container.innerHTML = '<div class="empty-state">No activity yet. Start watching!</div>';
+            return;
+          }
+
+          // Group by date
+          const byDate = {};
+          sessions.forEach(s => {
+            const date = s.session_date || s.created_at?.split('T')[0];
+            if (!byDate[date]) byDate[date] = [];
+            byDate[date].push(s);
+          });
+
+          let html = '<div class="activity-list">';
+          for (const [date, items] of Object.entries(byDate)) {
+            const dateStr = new Date(date).toLocaleDateString('en-US', { 
+              weekday: 'short', month: 'short', day: 'numeric' 
+            });
+            html += `<div class="activity-date">${dateStr}</div>`;
+            items.forEach(s => {
+              const title = s.title_english || s.title;
+              const epsWatched = s.to_episode - s.from_episode + 1;
+              html += `
+                <div class="activity-item">
+                  <img src="${s.poster_url || ''}" alt="${title}" class="activity-poster">
+                  <div class="activity-info">
+                    <a href="/anime/${s.anime_id}" class="activity-title">${title}</a>
+                    <span class="activity-detail">Watched EP ${s.from_episode}-${s.to_episode} (${epsWatched} eps)</span>
+                  </div>
+                </div>
+              `;
+            });
+          }
+          html += '</div>';
+          container.innerHTML = html;
+
+        } catch (e) {
+          container.innerHTML = '<div class="error">Error loading activity</div>';
+        }
+      }
+    });
+  </script>
+</body>
+</html>

@@ -10,64 +10,82 @@
   <nav class="navbar">
     <div class="container">
       <div class="nav-brand">
-        <h1>🎌 Anime Tracker</h1>
+        <a href="/"><h1>🎌 Anime Tracker</h1></a>
       </div>
       <div class="nav-links">
-        <a href="/">Home</a>
-        <button id="loginBtn" class="btn-primary">Login with Google</button>
+        <a href="/">Current Season</a>
+        <a href="/recently-finished">Recently Finished</a>
+        <a href="/dub-radar">Dub Radar</a>
+        <div class="nav-user" id="navUser">
+          <button id="loginBtn" class="btn-primary">Login with Google</button>
+        </div>
       </div>
+      <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
     </div>
   </nav>
 
   <main class="container">
-    <section class="hero">
-      <h2>Track Your Anime Journey</h2>
-      <p>Automatically track every anime each season. Monitor new episodes, dub availability, and your personal watch progress.</p>
-      <button id="getStartedBtn" class="btn-large">Get Started</button>
-    </section>
-
-    <section class="features">
-      <div class="feature-card">
-        <div class="feature-icon">📺</div>
-        <h3>Seasonal Tracking</h3>
-        <p>Automatically tracks every anime each season with daily updates for new episodes</p>
+    <!-- Season Header -->
+    <section class="season-header">
+      <div class="season-nav">
+        <button class="season-arrow" id="prevSeason">←</button>
+        <h2 id="seasonTitle">Winter 2026</h2>
+        <button class="season-arrow" id="nextSeason">→</button>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">🎙️</div>
-        <h3>Dub Awareness</h3>
-        <p>Track English dub status and platforms for all your favorite anime</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">📊</div>
-        <h3>Progress Tracking</h3>
-        <p>Monitor your watch progress with personal and seasonal completion stats</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">✅</div>
-        <h3>Session Marking</h3>
-        <p>Mark anime sessions and distinguish between airing and finished series</p>
+      <div class="season-stats" id="seasonStats">
+        <span class="stat"><strong id="statTotal">0</strong> Anime</span>
+        <span class="stat"><strong id="statAiring">0</strong> Airing</span>
+        <span class="stat"><strong id="statFinished">0</strong> Finished</span>
       </div>
     </section>
 
-    <section class="anime-preview" id="animePreview">
-      <h2>Current Season Anime</h2>
+    <!-- Filters -->
+    <section class="filter-section">
       <div class="filter-bar">
         <select id="statusFilter">
           <option value="">All Status</option>
-          <option value="true">Currently Airing</option>
-          <option value="false">Finished</option>
+          <option value="AIRING">Airing</option>
+          <option value="FINISHED">Finished</option>
+          <option value="NOT_AIRED">Upcoming</option>
         </select>
-        <button id="refreshBtn" class="btn-secondary">Refresh</button>
+        <select id="dubFilter">
+          <option value="">All Audio</option>
+          <option value="true">Has Dub</option>
+        </select>
+        <select id="platformFilter">
+          <option value="">All Platforms</option>
+          <option value="Crunchyroll">Crunchyroll</option>
+          <option value="HIDIVE">HIDIVE</option>
+          <option value="Netflix">Netflix</option>
+          <option value="Hulu">Hulu</option>
+          <option value="Disney+">Disney+</option>
+        </select>
+        <select id="sortFilter">
+          <option value="popularity">Most Popular</option>
+          <option value="score">Highest Rated</option>
+          <option value="title">Alphabetical</option>
+          <option value="newest">Newest</option>
+        </select>
+        <input type="text" id="searchInput" placeholder="Search anime..." class="search-input">
       </div>
+    </section>
+
+    <!-- Anime Grid -->
+    <section class="anime-section">
       <div id="animeGrid" class="anime-grid">
         <div class="loading">Loading anime...</div>
       </div>
     </section>
+
+    <!-- Load More -->
+    <div class="load-more-container" id="loadMoreContainer" style="display: none;">
+      <button id="loadMoreBtn" class="btn-secondary">Load More</button>
+    </div>
   </main>
 
   <footer>
     <div class="container">
-      <p>&copy; 2026 Anime Tracker. Powered by Jikan API (MyAnimeList)</p>
+      <p>&copy; 2026 Anime Tracker. Powered by AniList API</p>
     </div>
   </footer>
 

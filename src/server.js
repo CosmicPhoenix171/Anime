@@ -10,11 +10,13 @@ const cors = require('cors');
 require('./config/database');
 
 const animeService = require('./services/animeService');
+const anilistService = require('./services/anilistService');
 
 // Routes
 const authRoutes = require('./routes/auth');
 const animeRoutes = require('./routes/anime');
 const userRoutes = require('./routes/user');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -42,6 +44,7 @@ app.use(passport.session());
 app.use('/auth', authRoutes);
 app.use('/api/anime', animeRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Serve HTML pages
 app.get('/', (req, res) => {
@@ -56,23 +59,108 @@ app.get('/dashboard', (req, res) => {
   }
 });
 
-// Schedule daily updates
-cron.schedule(config.updateSchedule, () => {
-  console.log('Running scheduled anime database update...');
-  animeService.updateAnimeDatabase().catch(err => 
-    console.error('Scheduled update error:', err)
-  );
+// Additional pages
+app.get('/anime/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, '../views/anime-detail.html'));
 });
 
-// Initial update on startup (optional)
-setTimeout(() => {
-  console.log('Running initial anime database update...');
-  animeService.updateAnimeDatabase().catch(err => 
-    console.error('Initial update error:', err)
-  );
+app.get('/dub-radar', (req, res) => {
+  res.sendFile(path.join(__dirname, '../views/dub-radar.html'));
+});
+
+app.get('/recently-finished', (req, res) => {
+  res.sendFile(path.join(__dirname, '../views/recently-finished.html'));
+});
+
+app.get('/my-list', (req, res) => {
+  if (req.isAuthenticated()) {
+    res.sendFile(path.join(__dirname, '../views/my-list.html'));
+  } else {
+    res.redirect('/');
+  }
+});
+
+app.get('/my-season', (req, res) => {
+  if (req.isAuthenticated()) {
+    res.sendFile(path.join(__dirname, '../views/my-season.html'));
+  } else {
+    res.redirect('/');
+  }
+});
+
+app.get('/admin', (req, res) => {
+  if (req.isAuthenticated()) {
+    res.sendFile(path.join(__dirname, '../views/admin.html'));
+  } else {
+    res.redirect('/');
+  }
+});
+
+// ==========================================
+// SCHEDULED JOBS
+// ==========================================
+
+// Daily Update Job - Runs at 2 AM every day
+// Updates episode counts, airing status, detects finished shows
+cron.schedule('0 2 * * *', async () => {
+  console.log('\n⏰ Running scheduled Daily Update Job...');
+  try {
+    await animeService.dailyUpdateJob();
+  } catch (err) {
+    console.error('Scheduled daily update error:', err);
+  }
+});
+
+// Season Sync Job - Runs at midnight on season starts
+// Jan 1 (Winter), Apr 1 (Spring), Jul 1 (Summer), Oct 1 (Fall)
+cron.schedule('0 0 1 1,4,7,10 *', async () => {
+  console.log('\n🌱 Running scheduled Season Sync Job (Season Start)...');
+  try {
+    await animeService.seasonSyncJob();
+  } catch (err) {
+    console.error('Scheduled season sync error:', err);
+  }
+});
+
+// Weekly Season Sync - Runs every Sunday at 3 AM
+// Catches late additions to the season
+cron.schedule('0 3 * * 0', async () => {
+  console.log('\n🌱 Running scheduled Weekly Season Sync...');
+  try {
+    await animeService.seasonSyncJob();
+  } catch (err) {
+    console.error('Weekly season sync error:', err);
+  }
+});
+
+// Initial sync on startup (with delay to let DB initialize)
+setTimeout(async () => {
+  console.log('\n🚀 Running initial anime database sync...');
+  try {
+    const stats = await animeService.getAnimeStats();
+    if (stats.total === 0) {
+      console.log('Database is empty. Running full season sync...');
+      await animeService.seasonSyncJob();
+    } else {
+      console.log(`Database has ${stats.total} anime. Running daily update...`);
+      await animeService.dailyUpdateJob();
+    }
+  } catch (err) {
+    console.error('Initial sync error:', err);
+  }
 }, 5000);
+
+// Helper endpoint to get current season info
+app.get('/api/season-info', (req, res) => {
+  res.json({
+    currentSeason: anilistService.getCurrentSeason(),
+    currentYear: anilistService.getCurrentYear(),
+    nextSeason: anilistService.getNextSeason()
+  });
+});
 
 const PORT = config.port;
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`\n🎌 Anime Tracker Server running on http://localhost:${PORT}`);
+  console.log(`📅 Current Season: ${anilistService.getCurrentSeason()} ${anilistService.getCurrentYear()}`);
 });

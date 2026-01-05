@@ -48,16 +48,25 @@ class DubChecker {
 
   /**
    * Main method - Check if anime has dub using multiple sources
+   * Prioritizes shared Firebase data to save API calls for all users
    */
   async checkDub(anime) {
     const animeId = anime.id || anime.anilistId;
     const malId = anime.malId || anime.idMal;
     const title = anime.title || anime.titleRomaji;
 
-    // Check cache first
+    // Check local cache first
     const cached = this.getFromCache(animeId);
     if (cached) {
       return cached;
+    }
+
+    // Check if Firebase already has recent dub data (from another user)
+    const existingData = await this.getExistingDubData(animeId);
+    if (existingData) {
+      console.log(`✅ Using cached dub data for: ${title}`);
+      this.saveToCache(animeId, existingData);
+      return existingData;
     }
 
     console.log(`🔍 Checking dub for: ${title}`);
@@ -243,6 +252,40 @@ class DubChecker {
 
     } catch (error) {
       console.error('AniList dub check error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if Firebase already has recent dub data (shared by another user)
+   * Returns cached data if checked within last 12 hours
+   */
+  async getExistingDubData(animeId) {
+    try {
+      const snapshot = await refs.anime.child(animeId).once('value');
+      const anime = snapshot.val();
+
+      if (!anime) return null;
+
+      // Check if dub data exists and is recent (12 hours)
+      const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000);
+      
+      if (anime.dubCheckedAt && anime.dubCheckedAt > twelveHoursAgo) {
+        return {
+          hasDub: anime.hasDub || false,
+          confidence: anime.dubConfidence || 0,
+          sources: anime.dubSources || [],
+          platforms: anime.dubPlatforms || [],
+          dubEpisodes: anime.dubEpisodes || null,
+          dubStatus: anime.dubStatus || null,
+          lastChecked: anime.dubCheckedAt,
+          fromCache: true
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error checking existing dub data:', error);
       return null;
     }
   }

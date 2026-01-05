@@ -457,9 +457,14 @@ class AnimeSync {
 
   /**
    * Save anime to Firebase
+   * Preserves existing dub data and other user-contributed info
    */
   async saveAnime(anilistData) {
     const animeId = `al_${anilistData.id}`;
+    
+    // Check for existing data to preserve user-contributed info
+    const existingSnapshot = await refs.anime.child(animeId).once('value');
+    const existing = existingSnapshot.val() || {};
     
     const animeData = {
       anilistId: anilistData.id,
@@ -487,7 +492,17 @@ class AnimeSync {
       studios: anilistData.studios?.nodes?.map(s => s.name) || [],
       startDate: this.formatDate(anilistData.startDate),
       endDate: this.formatDate(anilistData.endDate),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      
+      // Preserve existing dub data (don't overwrite user-contributed info)
+      hasDub: existing.hasDub ?? null,
+      dubConfidence: existing.dubConfidence ?? null,
+      dubPlatforms: existing.dubPlatforms ?? null,
+      dubEpisodes: existing.dubEpisodes ?? null,
+      dubStatus: existing.dubStatus ?? null,
+      dubSources: existing.dubSources ?? null,
+      dubCheckedAt: existing.dubCheckedAt ?? null,
+      dubOverride: existing.dubOverride ?? null
     };
 
     // Remove any remaining undefined values (Firebase doesn't accept them)
@@ -497,9 +512,7 @@ class AnimeSync {
       }
     });
 
-    // Check if exists
-    const existing = await refs.anime.child(animeId).once('value');
-    const isNew = !existing.exists();
+    const isNew = !existingSnapshot.exists();
 
     if (isNew) {
       animeData.createdAt = Date.now();

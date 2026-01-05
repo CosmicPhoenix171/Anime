@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anime Details - Anime Tracker</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <a href="/"><h1>🎌 Anime Tracker</h1></a>
+      </div>
+      <div class="nav-links">
+        <a href="/">Current Season</a>
+        <a href="/recently-finished">Recently Finished</a>
+        <a href="/dub-radar">Dub Radar</a>
+        <div class="nav-user" id="navUser">
+          <button id="loginBtn" class="btn-primary">Login with Google</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div id="animeDetail" class="anime-detail">
+      <div class="loading">Loading anime details...</div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Anime Tracker. Powered by AniList API</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const animeId = window.location.pathname.split('/').pop();
+      const container = document.getElementById('animeDetail');
+      let currentUser = null;
+      let userProgress = null;
+
+      // Check auth
+      try {
+        const authRes = await fetch('/auth/status');
+        const authData = await authRes.json();
+        if (authData.authenticated) {
+          currentUser = authData.user;
+          updateNav();
+          // Get user progress for this anime
+          const progressRes = await fetch(`/api/user/progress/${animeId}`);
+          userProgress = await progressRes.json();
+        }
+      } catch (e) {}
+
+      function updateNav() {
+        const navUser = document.getElementById('navUser');
+        navUser.innerHTML = `
+          <div class="user-menu">
+            <img src="${currentUser.picture || '/images/default-avatar.png'}" alt="${currentUser.name}" class="user-avatar">
+            <div class="user-dropdown">
+              <a href="/dashboard">Dashboard</a>
+              <a href="/my-list">My List</a>
+              <a href="/my-season">My Season</a>
+              <a href="/auth/logout">Logout</a>
+            </div>
+          </div>
+        `;
+      }
+
+      // Load anime details
+      try {
+        const response = await fetch(`/api/anime/${animeId}`);
+        if (!response.ok) throw new Error('Anime not found');
+        const anime = await response.json();
+        renderAnime(anime);
+      } catch (error) {
+        container.innerHTML = `<div class="error">Error loading anime: ${error.message}</div>`;
+      }
+
+      function renderAnime(anime) {
+        const title = anime.title_english || anime.title_romaji || anime.title;
+        const status = anime.status === 'AIRING' ? 'Currently Airing' : 
+                       anime.status === 'FINISHED' ? 'Finished' : 'Upcoming';
+        const statusClass = anime.status === 'AIRING' ? 'badge-airing' : 
+                            anime.status === 'FINISHED' ? 'badge-finished' : 'badge-upcoming';
+
+        // Parse genres
+        const genres = anime.genres ? anime.genres.split(', ').map(g => 
+          `<span class="genre-tag">${g}</span>`
+        ).join('') : '';
+
+        // Dub section
+        let dubSection = '<p class="no-dub">No dub information available</p>';
+        if (anime.dubs && anime.dubs.length > 0) {
+          dubSection = anime.dubs.map(dub => `
+            <div class="dub-entry">
+              <span class="dub-platform">${dub.platform}</span>
+              <span class="dub-status ${dub.dub_status.toLowerCase()}">${dub.dub_status}</span>
+              ${dub.episodes_dubbed ? `<span class="dub-eps">${dub.episodes_dubbed} eps dubbed</span>` : ''}
+              ${dub.dub_start_date ? `<span class="dub-date">Started: ${dub.dub_start_date}</span>` : ''}
+            </div>
+          `).join('');
+        }
+
+        // User progress section
+        let progressSection = '';
+        if (currentUser) {
+          const watchedEp = userProgress?.last_episode || 0;
+          const userStatus = userProgress?.user_status || 'Not on list';
+          const behindBy = Math.max(0, (anime.episodes_aired || 0) - watchedEp);
+
+          progressSection = `
+            <div class="user-progress-section">
+              <h3>Your Progress</h3>
+              <div class="progress-info">
+                <span class="progress-status">${userStatus}</span>
+                <span class="progress-episodes">Episode ${watchedEp} / ${anime.total_episodes || '?'}</span>
+                ${behindBy > 0 ? `<span class="behind-badge">${behindBy} behind</span>` : ''}
+              </div>
+              <div class="progress-actions">
+                <button class="btn-primary" id="incrementBtn">+1 Episode</button>
+                <button class="btn-secondary" id="jumpToBtn">Jump to...</button>
+                <button class="btn-secondary" id="finishBtn">Mark Finished</button>
+              </div>
+              <div class="status-buttons">
+                <button class="btn-status ${userStatus === 'WATCHING' ? 'active' : ''}" data-status="WATCHING">Watching</button>
+                <button class="btn-status ${userStatus === 'PLANNED' ? 'active' : ''}" data-status="PLANNED">Planned</button>
+                <button class="btn-status ${userStatus === 'DROPPED' ? 'active' : ''}" data-status="DROPPED">Dropped</button>
+                <button class="btn-status ${userStatus === 'ON_HOLD' ? 'active' : ''}" data-status="ON_HOLD">On Hold</button>
+              </div>
+            </div>
+          `;
+        } else {
+          progressSection = `
+            <div class="login-prompt">
+              <p>Login to track your progress!</p>
+              <a href="/auth/google" class="btn-primary">Login with Google</a>
+            </div>
+          `;
+        }
+
+        container.innerHTML = `
+          <div class="anime-detail-header" ${anime.banner_url ? `style="background-image: url('${anime.banner_url}')"` : ''}>
+            <div class="anime-detail-overlay">
+              <div class="anime-poster">
+                <img src="${anime.poster_url || 'https://via.placeholder.com/300x450?text=No+Image'}" alt="${title}">
+              </div>
+              <div class="anime-info">
+                <h1>${title}</h1>
+                ${anime.title_romaji && anime.title_romaji !== title ? `<h2 class="alt-title">${anime.title_romaji}</h2>` : ''}
+                <div class="anime-meta">
+                  <span class="anime-badge ${statusClass}">${status}</span>
+                  <span class="meta-item">${anime.format || 'TV'}</span>
+                  <span class="meta-item">${anime.season} ${anime.year}</span>
+                  <span class="meta-item">EP ${anime.episodes_aired || 0}/${anime.total_episodes || '?'}</span>
+                  ${anime.average_score ? `<span class="meta-item score">⭐ ${anime.average_score}%</span>` : ''}
+                </div>
+                <div class="genres">${genres}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="anime-detail-body">
+            <div class="anime-detail-main">
+              <section class="synopsis-section">
+                <h3>Synopsis</h3>
+                <p>${anime.synopsis || 'No synopsis available.'}</p>
+              </section>
+
+              <section class="dub-section">
+                <h3>🎙️ Dub Information</h3>
+                ${dubSection}
+              </section>
+
+              ${progressSection}
+            </div>
+
+            <div class="anime-detail-sidebar">
+              <div class="info-card">
+                <h4>Information</h4>
+                <div class="info-row"><span>Format</span><span>${anime.format || 'Unknown'}</span></div>
+                <div class="info-row"><span>Episodes</span><span>${anime.total_episodes || 'Unknown'}</span></div>
+                <div class="info-row"><span>Status</span><span>${status}</span></div>
+                <div class="info-row"><span>Season</span><span>${anime.season} ${anime.year}</span></div>
+                <div class="info-row"><span>Source</span><span>${anime.source || 'Unknown'}</span></div>
+                ${anime.studios ? `<div class="info-row"><span>Studios</span><span>${anime.studios}</span></div>` : ''}
+                ${anime.start_date ? `<div class="info-row"><span>Started</span><span>${anime.start_date}</span></div>` : ''}
+                ${anime.end_date ? `<div class="info-row"><span>Ended</span><span>${anime.end_date}</span></div>` : ''}
+              </div>
+
+              ${anime.next_episode_date ? `
+                <div class="info-card next-episode">
+                  <h4>Next Episode</h4>
+                  <p>Episode ${anime.next_episode_number}</p>
+                  <p class="countdown" data-date="${anime.next_episode_date}">Loading...</p>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+
+        // Add event listeners for progress buttons
+        if (currentUser) {
+          document.getElementById('incrementBtn')?.addEventListener('click', async () => {
+            await updateProgress('increment');
+          });
+
+          document.getElementById('jumpToBtn')?.addEventListener('click', async () => {
+            const ep = prompt('Jump to episode:', (userProgress?.last_episode || 0) + 1);
+            if (ep) await updateProgress('jump', parseInt(ep));
+          });
+
+          document.getElementById('finishBtn')?.addEventListener('click', async () => {
+            await updateProgress('finish');
+          });
+
+          document.querySelectorAll('.btn-status').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              await updateStatus(btn.dataset.status);
+            });
+          });
+        }
+
+        // Countdown timer for next episode
+        const countdownEl = document.querySelector('.countdown');
+        if (countdownEl) {
+          updateCountdown(countdownEl);
+          setInterval(() => updateCountdown(countdownEl), 1000);
+        }
+      }
+
+      async function updateProgress(type, value = null) {
+        try {
+          let url = `/api/user/progress/${animeId}`;
+          if (type === 'increment') url += '/increment';
+          else if (type === 'finish') url += '/finish';
+          else if (type === 'jump') url = `/api/user/progress/${animeId}/jump`;
+
+          const options = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
+          if (type === 'jump') options.body = JSON.stringify({ episode: value });
+
+          const res = await fetch(url, options);
+          const data = await res.json();
+          userProgress = data;
+          location.reload(); // Simple refresh
+        } catch (err) {
+          alert('Error updating progress');
+        }
+      }
+
+      async function updateStatus(status) {
+        try {
+          await fetch(`/api/user/progress/${animeId}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+          });
+          location.reload();
+        } catch (err) {
+          alert('Error updating status');
+        }
+      }
+
+      function updateCountdown(el) {
+        const date = new Date(el.dataset.date);
+        const now = new Date();
+        const diff = date - now;
+
+        if (diff <= 0) {
+          el.textContent = 'Now airing!';
+          return;
+        }
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+        el.textContent = days > 0 
+          ? `${days}d ${hours}h ${mins}m`
+          : `${hours}h ${mins}m`;
+      }
+    });
+  </script>
+</body>
+</html>

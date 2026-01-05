@@ -273,13 +273,13 @@ function createAnimeCard(anime) {
     </span>` : '';
 
   return `
-    <div class="anime-card" onclick="showAnimeDetails('${anime.id}')">
+    <a href="./anime.html?id=${anime.id}" class="anime-card">
       <div class="card-image">
         <img src="${anime.coverImage || 'https://via.placeholder.com/200x280?text=No+Image'}" alt="${title}" loading="lazy">
         ${score ? `<span class="card-score">⭐ ${score}%</span>` : ''}
         ${dubBadge}
         <span class="card-status ${statusClass}">${statusText}</span>
-        ${currentUser ? `<button class="card-add-btn" onclick="event.stopPropagation(); addToList('${anime.id}')" title="Add to list">+</button>` : ''}
+        ${currentUser ? `<button class="card-add-btn" onclick="event.preventDefault(); event.stopPropagation(); addToList('${anime.id}')" title="Add to list">+</button>` : ''}
       </div>
       <div class="card-body">
         <h3 class="card-title" title="${title}">${title}</h3>
@@ -290,7 +290,7 @@ function createAnimeCard(anime) {
         ${nextEp ? `<div class="card-next-ep">${nextEp}</div>` : ''}
         ${anime.studios?.length ? `<div class="card-studio">${anime.studios[0]}</div>` : ''}
       </div>
-    </div>
+    </a>
   `;
 }
 

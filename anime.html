@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anime Details - Anime Tracker</title>
+  <link rel="stylesheet" href="./public/css/style.css">
+  <link rel="stylesheet" href="./public/css/anime-detail.css">
+</head>
+<body>
+  <div id="app">
+    <nav class="navbar">
+      <div class="container">
+        <div class="nav-brand">
+          <a href="./"><h1>🎌 Anime Tracker</h1></a>
+        </div>
+        <div class="nav-links">
+          <a href="./">Current Season</a>
+          <a href="./#recently-finished">Recently Finished</a>
+          <a href="./#dub-radar">Dub Radar</a>
+          <div class="nav-user" id="navUser">
+            <button id="loginBtn" class="btn-primary" onclick="handleLogin()">Login with Google</button>
+          </div>
+        </div>
+        <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+      </div>
+    </nav>
+
+    <!-- Banner Section -->
+    <div class="anime-banner" id="animeBanner">
+      <div class="banner-overlay"></div>
+    </div>
+
+    <main class="container">
+      <!-- Loading State -->
+      <div id="loadingState" class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading anime details...</p>
+      </div>
+
+      <!-- Error State -->
+      <div id="errorState" class="error-state" style="display: none;">
+        <h2>😕 Anime Not Found</h2>
+        <p>The anime you're looking for doesn't exist or couldn't be loaded.</p>
+        <a href="./" class="btn-primary">Back to Home</a>
+      </div>
+
+      <!-- Anime Details -->
+      <div id="animeContent" class="anime-detail-content" style="display: none;">
+        <!-- Main Info Section -->
+        <div class="anime-main">
+          <div class="anime-poster-large">
+            <img id="animePoster" src="" alt="">
+            <div class="poster-badges">
+              <span id="dubBadge" class="dub-badge" style="display: none;">🎙️ DUB</span>
+            </div>
+          </div>
+          
+          <div class="anime-info-main">
+            <h1 id="animeTitle" class="anime-title-large"></h1>
+            <h2 id="animeTitleNative" class="anime-title-native"></h2>
+            
+            <div class="anime-quick-info">
+              <span id="animeFormat" class="info-tag format"></span>
+              <span id="animeStatus" class="info-tag status"></span>
+              <span id="animeEpisodes" class="info-tag episodes"></span>
+              <span id="animeSeason" class="info-tag season"></span>
+            </div>
+
+            <div class="anime-score-section">
+              <div class="score-circle" id="scoreCircle">
+                <span id="animeScore">--</span>
+              </div>
+              <div class="score-info">
+                <span class="score-label">Average Score</span>
+                <span id="animePopularity" class="popularity"></span>
+              </div>
+            </div>
+
+            <div class="anime-genres" id="animeGenres"></div>
+
+            <div class="anime-actions">
+              <button id="addToListBtn" class="btn-primary" onclick="addToMyList()">
+                + Add to My List
+              </button>
+              <a id="anilistLink" href="" target="_blank" class="btn-secondary">
+                View on AniList
+              </a>
+              <a id="malLink" href="" target="_blank" class="btn-secondary" style="display: none;">
+                View on MAL
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <section class="anime-section">
+          <h3>Synopsis</h3>
+          <div id="animeDescription" class="anime-description"></div>
+        </section>
+
+        <!-- Airing Info (if currently airing) -->
+        <section id="airingSection" class="anime-section" style="display: none;">
+          <h3>Airing Schedule</h3>
+          <div class="airing-info">
+            <div class="next-episode">
+              <span class="label">Next Episode</span>
+              <span id="nextEpisode" class="value"></span>
+            </div>
+            <div class="next-episode-time">
+              <span class="label">Airing In</span>
+              <span id="nextEpisodeTime" class="value countdown"></span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Dub Information -->
+        <section id="dubSection" class="anime-section" style="display: none;">
+          <h3>🎙️ English Dub</h3>
+          <div class="dub-info">
+            <div class="dub-status-info">
+              <span class="label">Status</span>
+              <span id="dubStatus" class="value"></span>
+            </div>
+            <div class="dub-platforms-info">
+              <span class="label">Available On</span>
+              <div id="dubPlatforms" class="platforms-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Studios -->
+        <section class="anime-section">
+          <h3>Studios</h3>
+          <div id="animeStudios" class="studios-list"></div>
+        </section>
+
+        <!-- Related Anime -->
+        <section id="relatedSection" class="anime-section">
+          <h3>Related Anime</h3>
+          <div id="relatedAnime" class="related-grid">
+            <p class="loading-text">Loading related anime...</p>
+          </div>
+        </section>
+
+        <!-- External Links -->
+        <section class="anime-section">
+          <h3>External Links</h3>
+          <div id="externalLinks" class="external-links"></div>
+        </section>
+
+        <!-- Streaming Links -->
+        <section id="streamingSection" class="anime-section">
+          <h3>Watch Now</h3>
+          <div id="streamingLinks" class="streaming-links"></div>
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      <div class="container">
+        <p>&copy; 2026 Anime Tracker. Powered by AniList API & Firebase</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  
+  <!-- App Scripts -->
+  <script src="./public/js/firebase-config.js"></script>
+  <script src="./public/js/anime-detail.js"></script>
+</body>
+</html>

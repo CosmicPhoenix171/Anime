@@ -437,24 +437,31 @@ class AnimeSync {
       season: anilistData.season,
       year: anilistData.seasonYear,
       status: anilistData.status,
-      episodes: anilistData.episodes,
-      nextEpisode: anilistData.nextAiringEpisode?.episode,
+      episodes: anilistData.episodes || null,
+      nextEpisode: anilistData.nextAiringEpisode?.episode || null,
       nextEpisodeAt: anilistData.nextAiringEpisode?.airingAt 
         ? new Date(anilistData.nextAiringEpisode.airingAt * 1000).toISOString()
         : null,
-      format: anilistData.format,
+      format: anilistData.format || null,
       genres: anilistData.genres || [],
-      score: anilistData.averageScore,
-      popularity: anilistData.popularity,
-      coverImage: anilistData.coverImage?.large || anilistData.coverImage?.medium,
-      coverColor: anilistData.coverImage?.color,
-      bannerImage: anilistData.bannerImage,
-      description: anilistData.description,
+      score: anilistData.averageScore || null,
+      popularity: anilistData.popularity || 0,
+      coverImage: anilistData.coverImage?.large || anilistData.coverImage?.medium || null,
+      coverColor: anilistData.coverImage?.color || null,
+      bannerImage: anilistData.bannerImage || null,
+      description: anilistData.description || null,
       studios: anilistData.studios?.nodes?.map(s => s.name) || [],
       startDate: this.formatDate(anilistData.startDate),
       endDate: this.formatDate(anilistData.endDate),
       updatedAt: Date.now()
     };
+
+    // Remove any remaining undefined values (Firebase doesn't accept them)
+    Object.keys(animeData).forEach(key => {
+      if (animeData[key] === undefined) {
+        animeData[key] = null;
+      }
+    });
 
     // Check if exists
     const existing = await refs.anime.child(animeId).once('value');

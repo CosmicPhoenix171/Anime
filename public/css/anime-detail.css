@@ -517,6 +517,132 @@
   color: #888;
 }
 
+/* TMDB Rating Section */
+.tmdb-rating {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.tmdb-score {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #01d277;
+  background: rgba(1, 210, 119, 0.1);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+}
+
+.tmdb-votes {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+}
+
+/* Trailers Grid */
+.trailers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.trailer-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: white;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.trailer-card:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.trailer-thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.trailer-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  font-size: 3rem;
+  color: white;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.trailer-card:hover .play-overlay {
+  opacity: 1;
+  background: rgba(255, 0, 0, 0.6);
+}
+
+.trailer-title {
+  padding: 0.5rem 1rem 0;
+  font-weight: 500;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trailer-type {
+  padding: 0 1rem 0.5rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+}
+
+/* TMDB Providers Grid */
+.providers-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.provider-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  text-decoration: none;
+  color: white;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.provider-badge:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.provider-badge img {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.provider-badge span {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .anime-banner {
@@ -562,6 +688,10 @@
   }
 
   .related-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trailers-grid {
     grid-template-columns: 1fr;
   }
 }

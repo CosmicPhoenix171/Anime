@@ -157,6 +157,9 @@ async function fetchAniListDetails(anilistId, returnData = false) {
       displayExternalLinks(media.externalLinks);
       displayStreamingLinks(media.streamingEpisodes, media.externalLinks);
       
+      // Also fetch TMDB data for additional info (trailers, watch providers)
+      fetchTMDBData(media.title.english || media.title.romaji, media.seasonYear);
+      
       if (returnData) {
         return {
           id: `al_${media.id}`,
@@ -393,6 +396,136 @@ function displayStreamingLinks(episodes, externalLinks) {
   }
 
   streamingContainer.innerHTML = html;
+}
+
+/**
+ * Fetch additional data from TMDB (trailers, watch providers, ratings)
+ */
+async function fetchTMDBData(title, year) {
+  try {
+    if (typeof tmdbService === 'undefined') {
+      console.log('TMDB service not loaded');
+      return;
+    }
+
+    // Search for the anime on TMDB
+    const searchResult = await tmdbService.searchAnime(title, year);
+    if (!searchResult) {
+      console.log('No TMDB match found for:', title);
+      return;
+    }
+
+    const type = searchResult.media_type || (searchResult.first_air_date ? 'tv' : 'movie');
+    
+    // Get full details
+    const details = await tmdbService.getDetails(searchResult.id, type);
+    if (!details) return;
+
+    // Display TMDB section
+    displayTMDBInfo(details);
+
+    // Display trailers
+    if (details.videos?.length) {
+      displayTrailers(details.videos);
+    }
+
+    // Display additional watch providers from TMDB
+    if (details.watchProviders) {
+      displayTMDBWatchProviders(details.watchProviders);
+    }
+
+  } catch (error) {
+    console.error('TMDB fetch error:', error);
+  }
+}
+
+/**
+ * Display TMDB info section
+ */
+function displayTMDBInfo(details) {
+  const tmdbSection = document.getElementById('tmdbSection');
+  if (!tmdbSection) return;
+
+  tmdbSection.style.display = 'block';
+
+  // TMDB Rating
+  if (details.voteAverage) {
+    const rating = (details.voteAverage).toFixed(1);
+    document.getElementById('tmdbRating').innerHTML = `
+      <span class="tmdb-score">${rating}</span>
+      <span class="tmdb-votes">(${details.voteCount?.toLocaleString() || 0} votes)</span>
+    `;
+  }
+
+  // IMDB Link
+  if (details.imdbId) {
+    const imdbLink = document.getElementById('imdbLink');
+    if (imdbLink) {
+      imdbLink.href = `https://www.imdb.com/title/${details.imdbId}`;
+      imdbLink.style.display = 'inline-flex';
+    }
+  }
+
+  // TMDB Link
+  const tmdbLink = document.getElementById('tmdbLink');
+  if (tmdbLink) {
+    tmdbLink.href = `https://www.themoviedb.org/${details.type}/${details.id}`;
+    tmdbLink.style.display = 'inline-flex';
+  }
+}
+
+/**
+ * Display trailers section
+ */
+function displayTrailers(videos) {
+  const trailersSection = document.getElementById('trailersSection');
+  if (!trailersSection) return;
+
+  // Filter for trailers and teasers
+  const trailers = videos.filter(v => 
+    v.site === 'YouTube' && 
+    (v.type === 'Trailer' || v.type === 'Teaser' || v.type === 'Clip')
+  ).slice(0, 4);
+
+  if (!trailers.length) return;
+
+  trailersSection.style.display = 'block';
+
+  const container = document.getElementById('trailersList');
+  container.innerHTML = trailers.map(video => `
+    <a href="https://www.youtube.com/watch?v=${video.key}" target="_blank" class="trailer-card">
+      <div class="trailer-thumb">
+        <img src="https://img.youtube.com/vi/${video.key}/mqdefault.jpg" alt="${video.name}" loading="lazy">
+        <div class="play-overlay">▶</div>
+      </div>
+      <span class="trailer-title">${video.name}</span>
+      <span class="trailer-type">${video.type}</span>
+    </a>
+  `).join('');
+}
+
+/**
+ * Display watch providers from TMDB
+ */
+function displayTMDBWatchProviders(providers) {
+  const container = document.getElementById('tmdbProviders');
+  if (!container) return;
+
+  const allProviders = [
+    ...(providers.flatrate || []),
+    ...(providers.free || [])
+  ];
+
+  if (!allProviders.length) return;
+
+  document.getElementById('tmdbProvidersSection').style.display = 'block';
+
+  container.innerHTML = allProviders.map(p => `
+    <a href="${providers.link || '#'}" target="_blank" class="provider-badge" title="${p.name}">
+      <img src="${p.logo}" alt="${p.name}" loading="lazy">
+      <span>${p.name}</span>
+    </a>
+  `).join('');
 }
 
 /**

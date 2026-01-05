@@ -5,7 +5,7 @@
  * 1. AniList - Check external links and streaming services
  * 2. MyAnimeList - Cross-reference via AniList MAL ID
  * 3. Jikan API (MAL) - Official MAL data
- * 4. LiveChart.me data patterns
+ * 4. TMDB - Watch providers and translations
  * 5. Known dub databases (Funimation/Crunchyroll patterns)
  * 6. Manual overrides from Firebase
  */
@@ -87,7 +87,8 @@ class DubChecker {
         this.checkAniListDub(animeId),
         malId ? this.checkJikanDub(malId) : Promise.resolve(null),
         this.checkFirebaseOverride(animeId),
-        this.checkKnownDubList(animeId, title)
+        this.checkKnownDubList(animeId, title),
+        this.checkTMDBDub(title, anime.year || anime.seasonYear)
       ]);
 
       // Process AniList results
@@ -134,6 +135,22 @@ class DubChecker {
           results.confidence += 30;
           results.sources.push('Known Database');
           results.platforms.push(...(knownResult.platforms || []));
+        }
+      }
+
+      // Process TMDB results
+      if (checks[4].status === 'fulfilled' && checks[4].value) {
+        const tmdbResult = checks[4].value;
+        if (tmdbResult.hasDub) {
+          results.hasDub = true;
+          results.confidence += tmdbResult.confidence || 20;
+          results.sources.push('TMDB');
+          results.platforms.push(...(tmdbResult.platforms || []));
+        }
+        // Store TMDB ID for later use
+        if (tmdbResult.tmdbId) {
+          results.tmdbId = tmdbResult.tmdbId;
+          results.tmdbType = tmdbResult.tmdbType;
         }
       }
 
@@ -425,6 +442,27 @@ class DubChecker {
 
     } catch (error) {
       console.error('Known dub check error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check TMDB for dub information via watch providers and translations
+   */
+  async checkTMDBDub(title, year) {
+    try {
+      // Check if TMDB service is available
+      if (typeof tmdbService === 'undefined') {
+        console.log('TMDB service not loaded');
+        return null;
+      }
+
+      // Use the TMDB service's dub check
+      const result = await tmdbService.checkDub(title, year);
+      return result;
+
+    } catch (error) {
+      console.error('TMDB dub check error:', error);
       return null;
     }
   }

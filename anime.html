@@ -89,6 +89,12 @@
               <a id="malLink" href="" target="_blank" class="btn-secondary" style="display: none;">
                 View on MAL
               </a>
+              <a id="imdbLink" href="" target="_blank" class="btn-secondary" style="display: none;">
+                View on IMDb
+              </a>
+              <a id="tmdbLink" href="" target="_blank" class="btn-secondary" style="display: none;">
+                View on TMDB
+              </a>
             </div>
           </div>
         </div>
@@ -154,12 +160,30 @@
           <h3>Watch Now</h3>
           <div id="streamingLinks" class="streaming-links"></div>
         </section>
+
+        <!-- TMDB Info Section -->
+        <section id="tmdbSection" class="anime-section" style="display: none;">
+          <h3>📊 Additional Ratings</h3>
+          <div id="tmdbRating" class="tmdb-rating"></div>
+        </section>
+
+        <!-- Trailers Section -->
+        <section id="trailersSection" class="anime-section" style="display: none;">
+          <h3>🎬 Trailers & Videos</h3>
+          <div id="trailersList" class="trailers-grid"></div>
+        </section>
+
+        <!-- TMDB Watch Providers -->
+        <section id="tmdbProvidersSection" class="anime-section" style="display: none;">
+          <h3>📺 Where to Watch (via TMDB)</h3>
+          <div id="tmdbProviders" class="providers-grid"></div>
+        </section>
       </div>
     </main>
 
     <footer>
       <div class="container">
-        <p>&copy; 2026 Anime Tracker. Powered by AniList API & Firebase</p>
+        <p>&copy; 2026 Anime Tracker. Powered by AniList, TMDB & Firebase</p>
       </div>
     </footer>
   </div>
@@ -171,6 +195,7 @@
   
   <!-- App Scripts -->
   <script src="./public/js/firebase-config.js"></script>
+  <script src="./public/js/tmdb-service.js"></script>
   <script src="./public/js/anime-detail.js"></script>
 </body>
 </html>

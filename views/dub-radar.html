@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dub Radar - Anime Tracker</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <a href="/"><h1>🎌 Anime Tracker</h1></a>
+      </div>
+      <div class="nav-links">
+        <a href="/">Current Season</a>
+        <a href="/recently-finished">Recently Finished</a>
+        <a href="/dub-radar" class="active">Dub Radar</a>
+        <div class="nav-user" id="navUser">
+          <button id="loginBtn" class="btn-primary">Login with Google</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="page-header">
+      <h1>🎙️ Dub Radar</h1>
+      <p>Track English dubs across all platforms</p>
+    </div>
+
+    <!-- Platform Stats -->
+    <section class="platform-stats" id="platformStats">
+      <div class="loading">Loading platform stats...</div>
+    </section>
+
+    <!-- Tabs -->
+    <div class="dub-tabs">
+      <button class="tab-btn active" data-tab="premieres">New This Week</button>
+      <button class="tab-btn" data-tab="completed">Recently Completed</button>
+      <button class="tab-btn" data-tab="ongoing">Ongoing Dubs</button>
+    </div>
+
+    <!-- Tab Content -->
+    <section class="tab-content" id="tabContent">
+      <div class="loading">Loading dub data...</div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Anime Tracker. Powered by AniList API</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      let dubData = null;
+      let currentTab = 'premieres';
+
+      // Load dub radar data
+      try {
+        const response = await fetch('/api/anime/dub-radar');
+        dubData = await response.json();
+        renderPlatformStats();
+        renderTabContent();
+      } catch (error) {
+        document.getElementById('tabContent').innerHTML = `<div class="error">Error loading dub data</div>`;
+      }
+
+      function renderPlatformStats() {
+        const container = document.getElementById('platformStats');
+        if (!dubData.byPlatform || dubData.byPlatform.length === 0) {
+          container.innerHTML = '<p class="no-data">No platform data available yet</p>';
+          return;
+        }
+
+        container.innerHTML = dubData.byPlatform.map(p => `
+          <div class="platform-card">
+            <h3>${getPlatformIcon(p.platform)} ${p.platform}</h3>
+            <div class="platform-counts">
+              <span class="count-total">${p.count} dubs</span>
+              <span class="count-ongoing">${p.ongoing || 0} ongoing</span>
+              <span class="count-finished">${p.finished || 0} finished</span>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      function getPlatformIcon(platform) {
+        const icons = {
+          'Crunchyroll': '🟠',
+          'HIDIVE': '🔵',
+          'Netflix': '🔴',
+          'Hulu': '🟢',
+          'Disney+': '🔷'
+        };
+        return icons[platform] || '📺';
+      }
+
+      function renderTabContent() {
+        const container = document.getElementById('tabContent');
+        let anime = [];
+        let title = '';
+
+        switch (currentTab) {
+          case 'premieres':
+            anime = dubData.newPremieresThisWeek || [];
+            title = 'New Dub Premieres This Week';
+            break;
+          case 'completed':
+            anime = dubData.recentlyCompletedDubs || [];
+            title = 'Recently Completed Dubs';
+            break;
+          case 'ongoing':
+            anime = dubData.ongoingDubs || [];
+            title = 'Currently Ongoing Dubs';
+            break;
+        }
+
+        if (anime.length === 0) {
+          container.innerHTML = `
+            <div class="section-header"><h2>${title}</h2></div>
+            <div class="no-data">No dubs in this category yet. Add dub info in the admin panel!</div>
+          `;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="section-header"><h2>${title}</h2></div>
+          <div class="anime-grid">
+            ${anime.map(a => createDubCard(a)).join('')}
+          </div>
+        `;
+      }
+
+      function createDubCard(anime) {
+        const title = anime.title_english || anime.title;
+        const imageUrl = anime.poster_url || 'https://via.placeholder.com/200x280?text=No+Image';
+        
+        return `
+          <a href="/anime/${anime.id}" class="anime-card">
+            <div class="anime-card-image">
+              <img src="${imageUrl}" alt="${title}" loading="lazy">
+            </div>
+            <div class="anime-card-body">
+              <div class="anime-card-title">${title}</div>
+              <div class="anime-card-badges">
+                <span class="anime-badge badge-platform">${anime.platform}</span>
+                <span class="anime-badge ${anime.dub_status === 'FINISHED' ? 'badge-dub-complete' : 'badge-dub'}">
+                  ${anime.dub_status}
+                </span>
+              </div>
+              ${anime.episodes_dubbed ? `<div class="anime-card-info">${anime.episodes_dubbed} eps dubbed</div>` : ''}
+            </div>
+          </a>
+        `;
+      }
+
+      // Tab switching
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelector('.tab-btn.active').classList.remove('active');
+          btn.classList.add('active');
+          currentTab = btn.dataset.tab;
+          renderTabContent();
+        });
+      });
+
+      // Auth check
+      try {
+        const authRes = await fetch('/auth/status');
+        const authData = await authRes.json();
+        if (authData.authenticated) {
+          const navUser = document.getElementById('navUser');
+          navUser.innerHTML = `
+            <div class="user-menu">
+              <img src="${authData.user.picture || ''}" alt="${authData.user.name}" class="user-avatar">
+              <div class="user-dropdown">
+                <a href="/dashboard">Dashboard</a>
+                <a href="/my-list">My List</a>
+                <a href="/auth/logout">Logout</a>
+              </div>
+            </div>
+          `;
+        }
+      } catch (e) {}
+    });
+  </script>
+</body>
+</html>

@@ -40,6 +40,21 @@ body {
   color: #667eea;
 }
 
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.last-updated {
+  font-size: 0.75rem;
+  color: #888;
+  background: #f0f0f0;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: help;
+}
+
 .nav-links {
   display: flex;
   gap: 1rem;
@@ -551,3 +566,1171 @@ footer {
     border-radius: 8px;
   }
 }
+
+/* ==========================================
+   ENHANCED STYLES FOR FULL PLATFORM
+   ========================================== */
+
+/* Navigation Enhancements */
+.nav-brand a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.nav-brand a h1 {
+  color: #667eea;
+}
+
+.nav-user {
+  position: relative;
+}
+
+.user-menu {
+  position: relative;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #667eea;
+}
+
+.user-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 150px;
+  display: none;
+  z-index: 1000;
+}
+
+.user-menu:hover .user-dropdown {
+  display: block;
+}
+
+.user-dropdown a {
+  display: block;
+  padding: 0.75rem 1rem;
+  color: #333;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.user-dropdown a:hover {
+  background: #f5f5f5;
+}
+
+/* Season Header */
+.season-header {
+  text-align: center;
+  padding: 2rem 0;
+  color: white;
+}
+
+.season-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.season-nav h2 {
+  font-size: 2.5rem;
+  margin: 0;
+}
+
+.season-arrow {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.season-arrow:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.season-stats {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+}
+
+.season-stats .stat {
+  font-size: 1rem;
+  opacity: 0.9;
+}
+
+.season-stats .stat strong {
+  font-size: 1.5rem;
+  display: block;
+}
+
+/* Filter Section */
+.filter-section {
+  background: white;
+  padding: 1rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.filter-bar {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-bar select,
+.filter-bar input {
+  padding: 0.6rem 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* Enhanced Anime Cards */
+.anime-card {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  position: relative;
+}
+
+.anime-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.anime-card-image {
+  position: relative;
+  overflow: hidden;
+}
+
+.anime-card-image img {
+  width: 100%;
+  height: 280px;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.anime-card:hover .anime-card-image img {
+  transform: scale(1.05);
+}
+
+.anime-score {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(0, 0, 0, 0.8);
+  color: #ffc107;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.anime-card-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.badge-upcoming {
+  background: #9e9e9e;
+  color: white;
+}
+
+.badge-dub {
+  background: #ff9800;
+  color: white;
+}
+
+.badge-dub-complete {
+  background: #4caf50;
+  color: white;
+}
+
+.badge-platform {
+  background: #2196f3;
+  color: white;
+}
+
+.episode-count {
+  font-weight: 600;
+  color: #667eea;
+}
+
+.anime-card-actions {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+}
+
+.btn-icon {
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background: white;
+  transform: scale(1.1);
+}
+
+/* Page Headers */
+.page-header {
+  text-align: center;
+  padding: 2rem 0;
+  color: white;
+}
+
+.page-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.page-header p {
+  opacity: 0.9;
+}
+
+/* Tabs */
+.list-tabs,
+.dub-tabs,
+.admin-tabs {
+  display: flex;
+  gap: 0.5rem;
+  background: white;
+  padding: 0.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tab-btn:hover {
+  background: #f0f0f0;
+}
+
+.tab-btn.active {
+  background: #667eea;
+  color: white;
+}
+
+.tab-count {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 0.2rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+}
+
+.tab-btn.active .tab-count {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* List Items */
+.anime-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.list-item {
+  display: flex;
+  gap: 1rem;
+  background: white;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  align-items: center;
+}
+
+.list-item-poster img {
+  width: 60px;
+  height: 85px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.list-item-info {
+  flex: 1;
+}
+
+.list-item-title {
+  font-weight: 600;
+  color: #333;
+  text-decoration: none;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.list-item-title:hover {
+  color: #667eea;
+}
+
+.list-item-meta {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.list-item-progress {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.behind-text {
+  color: #f44336;
+  font-weight: 500;
+}
+
+.progress-bar-container {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-bar {
+  height: 100%;
+  background: #667eea;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.list-item-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-increment,
+.btn-finish {
+  background: #667eea;
+  color: white;
+  font-size: 0.9rem;
+}
+
+.btn-remove {
+  background: #f44336;
+  color: white;
+}
+
+.status-select {
+  padding: 0.4rem;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.stat-number {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #667eea;
+}
+
+.stat-label {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+/* Behind Section */
+.behind-section {
+  background: rgba(244, 67, 54, 0.1);
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  border: 2px solid #f44336;
+}
+
+.behind-section h2 {
+  color: #d32f2f;
+  margin-bottom: 1rem;
+}
+
+.behind-grid {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.behind-card {
+  display: flex;
+  gap: 0.75rem;
+  background: white;
+  padding: 0.75rem;
+  border-radius: 8px;
+  min-width: 250px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.behind-card img {
+  width: 50px;
+  height: 70px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.behind-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.behind-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.behind-count {
+  color: #f44336;
+  font-size: 0.85rem;
+}
+
+/* Dashboard Section */
+.dashboard-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-section h2 {
+  color: #667eea;
+  margin-bottom: 1rem;
+}
+
+/* Activity List */
+.activity-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.activity-date {
+  font-weight: 600;
+  color: #666;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #eee;
+  margin-top: 1rem;
+}
+
+.activity-date:first-child {
+  margin-top: 0;
+}
+
+.activity-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.activity-poster {
+  width: 40px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.activity-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.activity-title {
+  font-weight: 500;
+  color: #333;
+  text-decoration: none;
+}
+
+.activity-title:hover {
+  color: #667eea;
+}
+
+.activity-detail {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+/* Platform Stats */
+.platform-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.platform-card {
+  background: white;
+  padding: 1.25rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.platform-card h3 {
+  margin: 0 0 0.75rem 0;
+  color: #333;
+}
+
+.platform-counts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Anime Detail Page */
+.anime-detail-header {
+  background-size: cover;
+  background-position: center;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+
+.anime-detail-overlay {
+  display: flex;
+  gap: 2rem;
+  padding: 2rem;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.7) 100%);
+}
+
+.anime-poster img {
+  width: 220px;
+  height: 330px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.anime-info {
+  color: white;
+  flex: 1;
+}
+
+.anime-info h1 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.anime-info .alt-title {
+  font-size: 1.1rem;
+  opacity: 0.7;
+  font-weight: normal;
+  margin-bottom: 1rem;
+}
+
+.anime-meta {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.meta-item {
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+.meta-item.score {
+  color: #ffc107;
+}
+
+.genres {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.genre-tag {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.3rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+}
+
+.anime-detail-body {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 2rem;
+}
+
+.anime-detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.synopsis-section,
+.dub-section,
+.user-progress-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.synopsis-section h3,
+.dub-section h3,
+.user-progress-section h3 {
+  color: #667eea;
+  margin-bottom: 1rem;
+}
+
+.dub-entry {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  align-items: center;
+}
+
+.dub-platform {
+  font-weight: 600;
+}
+
+.dub-status {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.dub-status.finished {
+  background: #4caf50;
+  color: white;
+}
+
+.dub-status.ongoing {
+  background: #ff9800;
+  color: white;
+}
+
+.progress-info {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.progress-status {
+  font-weight: 600;
+  color: #667eea;
+}
+
+.behind-badge {
+  background: #f44336;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.progress-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.status-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-status {
+  padding: 0.5rem 1rem;
+  border: 2px solid #667eea;
+  background: white;
+  color: #667eea;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-status:hover,
+.btn-status.active {
+  background: #667eea;
+  color: white;
+}
+
+.anime-detail-sidebar .info-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+}
+
+.info-card h4 {
+  color: #667eea;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.info-row span:first-child {
+  color: #666;
+}
+
+.info-row span:last-child {
+  font-weight: 500;
+}
+
+.next-episode {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.next-episode h4 {
+  color: white;
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.countdown {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.login-prompt {
+  text-align: center;
+  padding: 1rem;
+}
+
+/* Admin Styles */
+.navbar-admin {
+  background: #1a1a2e;
+}
+
+.navbar-admin .nav-brand h1 {
+  color: #ff6b6b;
+}
+
+.admin-badge {
+  background: #ff6b6b;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  margin-left: 0.5rem;
+}
+
+.admin-container {
+  padding-top: 2rem;
+}
+
+.admin-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.admin-section h2 {
+  color: #333;
+  margin-bottom: 1rem;
+}
+
+.section-desc {
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.admin-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+}
+
+.status-success {
+  color: #4caf50;
+}
+
+.status-error {
+  color: #f44336;
+}
+
+.status-running {
+  color: #ff9800;
+}
+
+.sync-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.sync-card {
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.sync-card h3 {
+  margin-bottom: 0.5rem;
+}
+
+.sync-card p {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.review-card {
+  background: #f8f9fa;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.review-card img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.review-info {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.review-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.review-pop {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.dub-form {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.form-row label {
+  min-width: 120px;
+  font-weight: 500;
+}
+
+.form-input {
+  padding: 0.6rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.search-results {
+  margin: 1rem 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.search-result {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid #eee;
+  align-items: center;
+}
+
+.search-result img {
+  width: 40px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.result-info {
+  flex: 1;
+}
+
+.result-title {
+  font-weight: 600;
+  display: block;
+}
+
+.result-meta {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.btn-small {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-small.btn-select {
+  background: #667eea;
+  color: white;
+}
+
+.btn-small.btn-add-dub {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-small.btn-delete-dub {
+  background: #f44336;
+  color: white;
+}
+
+.dub-edit-form {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid #e0e0e0;
+}
+
+.user-avatar-small {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Section Groups */
+.section-group {
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  color: #667eea;
+  margin-bottom: 1rem;
+  padding-left: 0.5rem;
+  border-left: 4px solid #667eea;
+}
+
+/* Load More */
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+/* Empty States */
+.empty-state,
+.no-data,
+.no-results {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.error {
+  text-align: center;
+  padding: 2rem;
+  color: #f44336;
+}
+
+/* Checkbox Label */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: #333;
+}
+
+/* Season Selector */
+.season-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.season-selector span {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+/* Mobile Menu */
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #333;
+}
+
+@media (max-width: 768px) {
+  .mobile-menu-btn {
+    display: block;
+  }
+
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 1rem;
+    flex-direction: column;
+    gap: 0.5rem;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .nav-links.show {
+    display: flex;
+  }
+
+  .anime-detail-overlay {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .anime-poster img {
+    width: 160px;
+    height: 240px;
+  }
+
+  .anime-detail-body {
+    grid-template-columns: 1fr;
+  }
+
+  .list-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .list-item-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .filter-bar {
+    flex-direction: column;
+  }
+
+  .filter-bar select,
+  .filter-bar input {
+    width: 100%;
+  }
+}
+

@@ -535,6 +535,21 @@ class DubService {
     };
   }
 
+  /**
+   * Clear cache for a specific anime
+   */
+  clearCache(animeId) {
+    const cacheKey = `dub_${animeId}`;
+    this.dubCache.delete(cacheKey);
+  }
+
+  /**
+   * Clear all dub cache
+   */
+  clearAllCache() {
+    this.dubCache.clear();
+  }
+
   // Utility
   sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));

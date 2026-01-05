@@ -88,6 +88,31 @@ router.get('/search', async (req, res) => {
   }
 });
 
+// Check dub status for an anime (with fallback redundancy)
+router.get('/check-dub/:id', async (req, res) => {
+  try {
+    const animeId = parseInt(req.params.id);
+    const forceRefresh = req.query.refresh === 'true';
+    
+    // First get the anime from database
+    const anime = await animeService.getAnimeById(animeId);
+    if (!anime) {
+      return res.status(404).json({ error: 'Anime not found' });
+    }
+    
+    // If force refresh, clear cache
+    if (forceRefresh) {
+      dubService.clearCache(animeId);
+    }
+    
+    const dubStatus = await dubService.checkDubStatus(anime);
+    res.json(dubStatus);
+  } catch (error) {
+    console.error('Error checking dub status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get anime by ID
 router.get('/:id', async (req, res) => {
   try {

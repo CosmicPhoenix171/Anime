@@ -69,6 +69,11 @@
             <option value="OVA">OVA</option>
             <option value="ONA">ONA</option>
           </select>
+          <select id="dubFilter">
+            <option value="">All Languages</option>
+            <option value="dubbed">🎙️ Dubbed Only</option>
+            <option value="subbed">Subbed Only</option>
+          </select>
           <select id="sortFilter">
             <option value="popularity">Most Popular</option>
             <option value="score">Highest Rated</option>
@@ -101,6 +106,7 @@
   <!-- App Scripts -->
   <script src="./public/js/firebase-config.js"></script>
   <script src="./public/js/anime-sync.js"></script>
+  <script src="./public/js/dub-checker.js"></script>
   <script src="./public/js/app.js"></script>
 </body>
 </html>

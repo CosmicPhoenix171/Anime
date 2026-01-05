@@ -92,6 +92,7 @@ function setupEventListeners() {
   // Filters
   document.getElementById('statusFilter')?.addEventListener('change', filterAnime);
   document.getElementById('formatFilter')?.addEventListener('change', filterAnime);
+  document.getElementById('dubFilter')?.addEventListener('change', filterAnime);
   document.getElementById('sortFilter')?.addEventListener('change', filterAnime);
 
   // Search with debounce
@@ -178,6 +179,9 @@ async function loadAnime() {
     // Render
     renderAnimeGrid(animeCache);
 
+    // Check dubs in background (don't await)
+    setTimeout(() => checkDubsInBackground(), 2000);
+
   } catch (error) {
     console.error('Error loading anime:', error);
     grid.innerHTML = '<div class="error">Failed to load anime. Please refresh.</div>';
@@ -190,6 +194,7 @@ async function loadAnime() {
 function filterAnime() {
   const statusFilter = document.getElementById('statusFilter')?.value;
   const formatFilter = document.getElementById('formatFilter')?.value;
+  const dubFilter = document.getElementById('dubFilter')?.value;
   const sortFilter = document.getElementById('sortFilter')?.value;
   const searchQuery = document.getElementById('searchInput')?.value.toLowerCase();
 
@@ -202,6 +207,13 @@ function filterAnime() {
 
   if (formatFilter) {
     filtered = filtered.filter(a => a.format === formatFilter);
+  }
+
+  // Dub filter
+  if (dubFilter === 'dubbed') {
+    filtered = filtered.filter(a => a.hasDub === true);
+  } else if (dubFilter === 'subbed') {
+    filtered = filtered.filter(a => !a.hasDub);
   }
 
   if (searchQuery) {
@@ -252,12 +264,20 @@ function createAnimeCard(anime) {
   const episodes = anime.episodes ? `${anime.episodes} eps` : 'TBA';
   const nextEp = getNextEpisodeText(anime);
   const title = anime.titleEnglish || anime.title || anime.titleRomaji || 'Unknown';
+  
+  // Dub badge
+  const dubBadge = anime.hasDub ? `
+    <span class="card-dub-badge ${anime.dubConfidence >= 80 ? 'confirmed' : 'likely'}" 
+          title="${anime.dubPlatforms?.join(', ') || 'English Dub Available'}">
+      🎙️ DUB
+    </span>` : '';
 
   return `
     <div class="anime-card" onclick="showAnimeDetails('${anime.id}')">
       <div class="card-image">
         <img src="${anime.coverImage || 'https://via.placeholder.com/200x280?text=No+Image'}" alt="${title}" loading="lazy">
         ${score ? `<span class="card-score">⭐ ${score}%</span>` : ''}
+        ${dubBadge}
         <span class="card-status ${statusClass}">${statusText}</span>
         ${currentUser ? `<button class="card-add-btn" onclick="event.stopPropagation(); addToList('${anime.id}')" title="Add to list">+</button>` : ''}
       </div>
@@ -337,10 +357,10 @@ function updateSeasonDisplay() {
 /**
  * Update stats display
  */
-function updateStats() {
+async function updateStats() {
   const total = animeCache.length;
   const airing = animeCache.filter(a => a.status === 'RELEASING').length;
-  const dubbed = 0; // TODO: Implement dub tracking
+  const dubbed = animeCache.filter(a => a.hasDub).length;
 
   document.getElementById('statTotal').textContent = total;
   document.getElementById('statAiring').textContent = airing;
@@ -355,6 +375,53 @@ function updateStats() {
       document.getElementById('lastUpdated').textContent = `Updated ${timeAgo}`;
     }
   });
+}
+
+/**
+ * Check dubs for all anime in current view (background)
+ */
+async function checkDubsInBackground() {
+  // Get anime that haven't been checked recently (24 hours)
+  const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+  const needsCheck = animeCache.filter(a => 
+    !a.dubCheckedAt || a.dubCheckedAt < oneDayAgo
+  );
+
+  if (needsCheck.length === 0) {
+    console.log('✅ All dubs recently checked');
+    return;
+  }
+
+  console.log(`🎬 Checking dubs for ${needsCheck.length} anime...`);
+
+  // Check in batches to avoid rate limiting
+  const batchSize = 5;
+  for (let i = 0; i < needsCheck.length; i += batchSize) {
+    const batch = needsCheck.slice(i, i + batchSize);
+    
+    await Promise.all(batch.map(async anime => {
+      try {
+        const result = await dubChecker.checkDub(anime);
+        // Update local cache
+        const idx = animeCache.findIndex(a => a.id === anime.id);
+        if (idx !== -1) {
+          animeCache[idx].hasDub = result.hasDub;
+          animeCache[idx].dubPlatforms = result.platforms;
+          animeCache[idx].dubConfidence = result.confidence;
+        }
+      } catch (err) {
+        console.error(`Dub check failed for ${anime.title}:`, err);
+      }
+    }));
+
+    // Small delay between batches
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  // Update stats and re-render to show dub badges
+  updateStats();
+  filterAnime();
+  console.log('✅ Dub check complete');
 }
 
 /**

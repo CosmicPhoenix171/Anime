@@ -423,6 +423,39 @@ body {
   text-overflow: ellipsis;
 }
 
+/* Dub Badge */
+.card-dub-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(4px);
+}
+
+.card-dub-badge.confirmed {
+  background: linear-gradient(135deg, #00c853, #00a846);
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 200, 83, 0.4);
+}
+
+.card-dub-badge.likely {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  color: white;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
+}
+
+/* Move add button when dub badge present */
+.card-image:has(.card-dub-badge) .card-add-btn {
+  left: auto;
+  right: 8px;
+  top: 40px;
+}
+
 /* No Results */
 .no-results {
   grid-column: 1 / -1;

@@ -1,19 +1,16 @@
 /**
  * Firebase Configuration - Serverless Anime Tracker
- * 
- * IMPORTANT: Replace these values with your Firebase project config
- * Get these from: Firebase Console > Project Settings > General > Your apps
  */
 
 const firebaseConfig = {
-  // TODO: Replace with your Firebase config
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyD9U4bXTHzgaA5YbGiXbyrhIAUno4z4vPk",
+  authDomain: "anime-461f8.firebaseapp.com",
+  databaseURL: "https://anime-461f8-default-rtdb.firebaseio.com",
+  projectId: "anime-461f8",
+  storageBucket: "anime-461f8.firebasestorage.app",
+  messagingSenderId: "179091956650",
+  appId: "1:179091956650:web:a9d52046c3c3b5fc7bc1d3",
+  measurementId: "G-QQ7JPQB7PR"
 };
 
 // Initialize Firebase

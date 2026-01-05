@@ -65,7 +65,7 @@ async function initializeApp() {
  */
 function setupEventListeners() {
   // Season navigation
-  document.getElementById('prevSeason')?.addEventListener('click', () => {
+  document.getElementById('prevSeason')?.addEventListener('click', async () => {
     const idx = seasons.indexOf(currentSeason);
     if (idx === 0) {
       currentSeason = seasons[3];
@@ -74,10 +74,10 @@ function setupEventListeners() {
       currentSeason = seasons[idx - 1];
     }
     updateSeasonDisplay();
-    loadAnime();
+    await loadAnimeWithSync();
   });
 
-  document.getElementById('nextSeason')?.addEventListener('click', () => {
+  document.getElementById('nextSeason')?.addEventListener('click', async () => {
     const idx = seasons.indexOf(currentSeason);
     if (idx === 3) {
       currentSeason = seasons[0];
@@ -86,7 +86,7 @@ function setupEventListeners() {
       currentSeason = seasons[idx + 1];
     }
     updateSeasonDisplay();
-    loadAnime();
+    await loadAnimeWithSync();
   });
 
   // Filters
@@ -104,6 +104,46 @@ function setupEventListeners() {
   document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
     document.querySelector('.nav-links')?.classList.toggle('show');
   });
+}
+
+/**
+ * Load anime with sync check - used when changing seasons
+ */
+async function loadAnimeWithSync() {
+  const grid = document.getElementById('animeGrid');
+  grid.innerHTML = '<div class="loading">Checking for updates...</div>';
+
+  try {
+    // Check if we have data for this season
+    const snapshot = await refs.anime
+      .orderByChild('year')
+      .equalTo(currentYear)
+      .limitToFirst(1)
+      .once('value');
+
+    let hasSeasonData = false;
+    snapshot.forEach(child => {
+      const anime = child.val();
+      if (anime.season === currentSeason) {
+        hasSeasonData = true;
+      }
+    });
+
+    // If no data for this season, sync it
+    if (!hasSeasonData) {
+      console.log(`📥 No data for ${currentSeason} ${currentYear} - syncing...`);
+      showSyncBanner(true);
+      await animeSync.syncSeason(currentSeason, currentYear);
+      hideSyncBanner();
+    }
+
+    // Now load the anime
+    await loadAnime();
+
+  } catch (error) {
+    console.error('Error loading anime with sync:', error);
+    grid.innerHTML = '<div class="error">Failed to load anime. Please refresh.</div>';
+  }
 }
 
 /**

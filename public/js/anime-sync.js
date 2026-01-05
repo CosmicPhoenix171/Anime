@@ -168,6 +168,40 @@ class AnimeSync {
   }
 
   /**
+   * Sync a specific season - used when navigating to a new season
+   */
+  async syncSeason(season, year) {
+    let added = 0;
+    let updated = 0;
+
+    this.updateProgress(10, `Fetching ${season} ${year} anime...`);
+    const animeList = await this.fetchSeasonAnime(season, year);
+    
+    this.updateProgress(30, `Saving ${animeList.length} anime...`);
+    for (let i = 0; i < animeList.length; i++) {
+      const result = await this.saveAnime(animeList[i]);
+      if (result.isNew) added++;
+      else updated++;
+      
+      if (i % 10 === 0) {
+        this.updateProgress(30 + (i / animeList.length) * 65, 
+          `Saving anime ${i + 1}/${animeList.length}...`);
+      }
+    }
+
+    // Log the sync
+    await refs.syncLog.child(`seasons/${season}_${year}`).set({
+      timestamp: Date.now(),
+      count: animeList.length,
+      added,
+      updated
+    });
+
+    console.log(`✅ ${season} ${year} sync complete: ${added} added, ${updated} updated`);
+    return { added, updated, total: animeList.length };
+  }
+
+  /**
    * Daily update - checks all airing anime for updates
    */
   async dailyUpdate() {

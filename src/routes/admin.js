@@ -3,6 +3,7 @@ const router = express.Router();
 const { ensureAuthenticated, ensureAdmin } = require('../middleware/auth');
 const animeService = require('../services/animeService');
 const userService = require('../services/userService');
+const dubService = require('../services/dubService');
 const db = require('../config/database');
 
 // All admin routes require authentication and admin status
@@ -199,6 +200,51 @@ router.post('/sync/daily', async (req, res) => {
       console.error('Admin-triggered daily update error:', err)
     );
     res.json({ message: 'Daily update started in background' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Trigger dub sync (uses multiple sources with fallback)
+router.post('/sync/dubs', async (req, res) => {
+  try {
+    // Run in background
+    dubService.syncAllDubs().catch(err => 
+      console.error('Admin-triggered dub sync error:', err)
+    );
+    res.json({ message: 'Dub sync started in background. This uses multiple sources with fallback redundancy.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Check dub status for a single anime (uses all sources)
+router.get('/dubs/check/:animeId', async (req, res) => {
+  try {
+    const anime = await db.getAsync(
+      'SELECT id, title, title_english, anilist_id, mal_id FROM anime WHERE id = ?',
+      [req.params.animeId]
+    );
+    
+    if (!anime) {
+      return res.status(404).json({ error: 'Anime not found' });
+    }
+
+    const dubInfo = await dubService.checkDubStatus(anime);
+    res.json({
+      anime: { id: anime.id, title: anime.title },
+      dub: dubInfo
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get platform statistics
+router.get('/dubs/stats', async (req, res) => {
+  try {
+    const stats = await dubService.getPlatformStats();
+    res.json(stats);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

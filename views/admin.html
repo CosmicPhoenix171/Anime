@@ -423,6 +423,13 @@
                 <p><small>Auto-runs: Daily at 2 AM</small></p>
                 <button id="triggerDailyUpdate" class="btn-primary">Run Daily Update</button>
               </div>
+              
+              <div class="sync-card">
+                <h3>🎙️ Dub Sync</h3>
+                <p>Checks dub status using multiple sources with fallback redundancy</p>
+                <p><small>Sources: Database → AniList → Jikan (MAL) → LiveChart</small></p>
+                <button id="triggerDubSync" class="btn-primary">Run Dub Sync</button>
+              </div>
             </div>
           </div>
           
@@ -442,6 +449,12 @@
           if (!confirm('Start daily update?')) return;
           await fetch('/api/admin/sync/daily', { method: 'POST' });
           alert('Daily update started in background.');
+        });
+
+        document.getElementById('triggerDubSync').addEventListener('click', async () => {
+          if (!confirm('Start dub sync? This checks multiple sources and may take a while.')) return;
+          await fetch('/api/admin/sync/dubs', { method: 'POST' });
+          alert('Dub sync started. Using AniList → Jikan → LiveChart with fallback redundancy.');
         });
 
         loadSyncLogs();

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const animeService = require('../services/animeService');
+const dubService = require('../services/dubService');
 const { ensureAuthenticated, ensureAdmin } = require('../middleware/auth');
 
 // ==========================================

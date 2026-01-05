@@ -365,9 +365,33 @@ async function addToList(animeId) {
 /**
  * Handle auth state changes
  */
-function handleAuthChange(user) {
+async function handleAuthChange(user) {
+  const previousUser = currentUser;
   currentUser = user;
   updateNavForAuth();
+
+  // Check if user just logged in or switched accounts
+  if (user && (!previousUser || previousUser.uid !== user.uid)) {
+    console.log('🔄 Session changed - checking for updates...');
+    
+    try {
+      // Check if sync is needed
+      const syncCheck = await animeSync.checkSyncNeeded();
+      
+      if (syncCheck.needed) {
+        showSyncBanner(true);
+        await animeSync.runSync(syncCheck.type);
+        hideSyncBanner();
+      }
+
+      // Reload anime to get fresh data
+      await loadAnime();
+      
+      console.log('✅ Session sync complete');
+    } catch (error) {
+      console.error('Session sync error:', error);
+    }
+  }
 }
 
 /**

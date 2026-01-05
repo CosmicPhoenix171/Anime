@@ -40,6 +40,21 @@ body {
   color: #667eea;
 }
 
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.last-updated {
+  font-size: 0.75rem;
+  color: #888;
+  background: #f0f0f0;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: help;
+}
+
 .nav-links {
   display: flex;
   gap: 1rem;

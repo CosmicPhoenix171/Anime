@@ -182,6 +182,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('statTotal').textContent = stats.total || 0;
       document.getElementById('statAiring').textContent = stats.airing || 0;
       document.getElementById('statFinished').textContent = stats.finished || 0;
+      
+      // Update last updated indicator
+      const lastUpdatedEl = document.getElementById('lastUpdated');
+      if (lastUpdatedEl && stats.lastUpdated) {
+        const date = new Date(stats.lastUpdated);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        let timeAgo;
+        if (diffMins < 1) timeAgo = 'just now';
+        else if (diffMins < 60) timeAgo = `${diffMins}m ago`;
+        else if (diffHours < 24) timeAgo = `${diffHours}h ago`;
+        else timeAgo = `${diffDays}d ago`;
+        
+        lastUpdatedEl.textContent = `Updated: ${timeAgo}`;
+        lastUpdatedEl.title = `Last sync: ${date.toLocaleString()}`;
+      }
     } catch (e) {
       // Ignore stats errors
     }

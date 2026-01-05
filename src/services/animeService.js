@@ -366,7 +366,21 @@ class AnimeService {
       FROM dubs
     `);
 
-    return { ...stats, ...dubStats, season, year };
+    // Get last sync time
+    const lastSync = await db.getAsync(`
+      SELECT completed_at FROM sync_logs 
+      WHERE status = 'success' 
+      ORDER BY completed_at DESC 
+      LIMIT 1
+    `);
+
+    return { 
+      ...stats, 
+      ...dubStats, 
+      season, 
+      year,
+      lastUpdated: lastSync?.completed_at || null
+    };
   }
 
   // ==========================================

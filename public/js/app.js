@@ -247,27 +247,28 @@ function renderAnimeGrid(animeList) {
  */
 function createAnimeCard(anime) {
   const statusClass = getStatusClass(anime.status);
-  const score = anime.score ? `⭐ ${anime.score}%` : '';
+  const statusText = formatStatus(anime.status);
+  const score = anime.score ? anime.score : null;
   const episodes = anime.episodes ? `${anime.episodes} eps` : 'TBA';
   const nextEp = getNextEpisodeText(anime);
+  const title = anime.titleEnglish || anime.title || anime.titleRomaji || 'Unknown';
 
   return `
-    <div class="anime-card" onclick="showAnimeDetails('${anime.id}')" style="--accent-color: ${anime.coverColor || '#6366f1'}">
-      <div class="anime-poster">
-        <img src="${anime.coverImage || '/images/no-poster.png'}" alt="${anime.title}" loading="lazy">
-        <div class="anime-overlay">
-          <span class="anime-status ${statusClass}">${formatStatus(anime.status)}</span>
-          ${score ? `<span class="anime-score">${score}</span>` : ''}
-        </div>
-        ${currentUser ? `<button class="add-btn" onclick="event.stopPropagation(); addToList('${anime.id}')">+</button>` : ''}
+    <div class="anime-card" onclick="showAnimeDetails('${anime.id}')">
+      <div class="card-image">
+        <img src="${anime.coverImage || 'https://via.placeholder.com/200x280?text=No+Image'}" alt="${title}" loading="lazy">
+        ${score ? `<span class="card-score">⭐ ${score}%</span>` : ''}
+        <span class="card-status ${statusClass}">${statusText}</span>
+        ${currentUser ? `<button class="card-add-btn" onclick="event.stopPropagation(); addToList('${anime.id}')" title="Add to list">+</button>` : ''}
       </div>
-      <div class="anime-info">
-        <h3 class="anime-title" title="${anime.title}">${anime.title}</h3>
-        <div class="anime-meta">
-          <span>${anime.format || 'TV'}</span>
-          <span>${episodes}</span>
+      <div class="card-body">
+        <h3 class="card-title" title="${title}">${title}</h3>
+        <div class="card-meta">
+          <span class="card-format">${anime.format || 'TV'}</span>
+          <span class="card-eps">${episodes}</span>
         </div>
-        ${nextEp ? `<div class="anime-next">${nextEp}</div>` : ''}
+        ${nextEp ? `<div class="card-next-ep">${nextEp}</div>` : ''}
+        ${anime.studios?.length ? `<div class="card-studio">${anime.studios[0]}</div>` : ''}
       </div>
     </div>
   `;

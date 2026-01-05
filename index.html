@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anime Tracker - Seasonal Anime Dashboard</title>
+  <link rel="stylesheet" href="./public/css/style.css">
+</head>
+<body>
+  <div id="app">
+    <nav class="navbar">
+      <div class="container">
+        <div class="nav-brand">
+          <a href="./"><h1>🎌 Anime Tracker</h1></a>
+          <span class="sync-status" id="syncStatus" title="Sync status"></span>
+        </div>
+        <div class="nav-links">
+          <a href="./" class="active">Current Season</a>
+          <a href="#recently-finished" onclick="showPage('recently-finished')">Recently Finished</a>
+          <a href="#dub-radar" onclick="showPage('dub-radar')">Dub Radar</a>
+          <div class="nav-user" id="navUser">
+            <button id="loginBtn" class="btn-primary" onclick="handleLogin()">Login with Google</button>
+          </div>
+        </div>
+        <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+      </div>
+    </nav>
+
+    <main class="container">
+      <!-- Sync Progress Banner -->
+      <div id="syncBanner" class="sync-banner" style="display: none;">
+        <div class="sync-progress">
+          <span id="syncMessage">Syncing anime data...</span>
+          <div class="progress-bar">
+            <div class="progress-fill" id="syncProgress" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Season Header -->
+      <section class="season-header">
+        <div class="season-nav">
+          <button class="season-arrow" id="prevSeason">←</button>
+          <h2 id="seasonTitle">Winter 2026</h2>
+          <button class="season-arrow" id="nextSeason">→</button>
+        </div>
+        <div class="season-stats" id="seasonStats">
+          <span class="stat"><strong id="statTotal">0</strong> Anime</span>
+          <span class="stat"><strong id="statAiring">0</strong> Airing</span>
+          <span class="stat"><strong id="statDubbed">0</strong> Dubbed</span>
+          <span class="stat last-updated" id="lastUpdated"></span>
+        </div>
+      </section>
+
+      <!-- Filters -->
+      <section class="filter-section">
+        <div class="filter-bar">
+          <select id="statusFilter">
+            <option value="">All Status</option>
+            <option value="RELEASING">Airing</option>
+            <option value="FINISHED">Finished</option>
+            <option value="NOT_YET_RELEASED">Upcoming</option>
+          </select>
+          <select id="formatFilter">
+            <option value="">All Formats</option>
+            <option value="TV">TV</option>
+            <option value="TV_SHORT">TV Short</option>
+            <option value="MOVIE">Movie</option>
+            <option value="OVA">OVA</option>
+            <option value="ONA">ONA</option>
+          </select>
+          <select id="sortFilter">
+            <option value="popularity">Most Popular</option>
+            <option value="score">Highest Rated</option>
+            <option value="title">Alphabetical</option>
+          </select>
+          <input type="text" id="searchInput" placeholder="Search anime..." class="search-input">
+        </div>
+      </section>
+
+      <!-- Anime Grid -->
+      <section class="anime-section">
+        <div id="animeGrid" class="anime-grid">
+          <div class="loading">Loading anime...</div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="container">
+        <p>&copy; 2026 Anime Tracker. Powered by AniList API & Firebase</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  
+  <!-- App Scripts -->
+  <script src="./public/js/firebase-config.js"></script>
+  <script src="./public/js/anime-sync.js"></script>
+  <script src="./public/js/app.js"></script>
+</body>
+</html>

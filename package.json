@@ -1,25 +1,8 @@
 {
-  "name": "anime",
-  "version": "1.0.0",
-  "description": "Seasonal Anime Dashboard + Dub Tracker + Personal Watch Progress with full automation",
-  "main": "src/server.js",
-  "scripts": {
-    "start": "node src/server.js",
-    "dev": "node src/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": ["anime", "tracker", "seasonal", "dub", "myanimelist"],
-  "author": "",
+  "name": "anime-tracker",
+  "version": "2.0.0",
+  "description": "Serverless Anime Tracker using Firebase Realtime Database",
+  "keywords": ["anime", "tracker", "firebase", "serverless", "anilist"],
   "license": "ISC",
-  "dependencies": {
-    "axios": "^1.13.2",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^5.2.1",
-    "express-session": "^1.18.2",
-    "node-cron": "^4.2.1",
-    "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0",
-    "sqlite3": "^5.1.7"
-  }
+  "homepage": "https://cosmicphoenix171.github.io/Anime/"
 }

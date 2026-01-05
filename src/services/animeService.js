@@ -369,7 +369,7 @@ class AnimeService {
     // Get last sync time
     const lastSync = await db.getAsync(`
       SELECT completed_at FROM sync_logs 
-      WHERE status = 'success' 
+      WHERE status = 'SUCCESS' 
       ORDER BY completed_at DESC 
       LIMIT 1
     `);

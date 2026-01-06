@@ -19,9 +19,66 @@ const seasonNames = { WINTER: 'Winter', SPRING: 'Spring', SUMMER: 'Summer', FALL
 // Local Cache Configuration
 const LOCAL_CACHE = {
   PREFIX: 'anime_cache_',
-  EXPIRY: 30 * 60 * 1000, // 30 minutes for local cache
-  MAX_SEASONS: 6 // Keep max 6 seasons cached to save storage
+  // Different expiry based on season status
+  EXPIRY_CURRENT: 15 * 60 * 1000,    // 15 minutes for current/airing season
+  EXPIRY_RECENT: 2 * 60 * 60 * 1000, // 2 hours for recently finished
+  EXPIRY_OLD: 7 * 24 * 60 * 60 * 1000, // 7 days for old finished seasons
+  MAX_SEASONS: 8 // Keep max 8 seasons cached
 };
+
+/**
+ * Check if a season is the current one
+ */
+function isCurrentSeason(season, year) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const currentSeasonIdx = Math.floor((month - 1) / 3);
+  const currentSeasonName = seasons[currentSeasonIdx];
+  
+  return season === currentSeasonName && year === currentYear;
+}
+
+/**
+ * Check if a season is finished (all shows done airing)
+ */
+function isFinishedSeason(season, year) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const currentSeasonIdx = Math.floor((month - 1) / 3);
+  
+  // Season is finished if it's from a past year, or earlier in the same year
+  if (year < currentYear) return true;
+  if (year === currentYear) {
+    const targetSeasonIdx = seasons.indexOf(season);
+    return targetSeasonIdx < currentSeasonIdx;
+  }
+  return false;
+}
+
+/**
+ * Get appropriate cache expiry for a season
+ */
+function getCacheExpiry(season, year) {
+  if (isCurrentSeason(season, year)) {
+    return LOCAL_CACHE.EXPIRY_CURRENT;
+  }
+  if (isFinishedSeason(season, year)) {
+    // Check how old the season is
+    const now = new Date();
+    const seasonEndMonth = (seasons.indexOf(season) + 1) * 3;
+    const seasonEndDate = new Date(year, seasonEndMonth, 1);
+    const monthsAgo = (now - seasonEndDate) / (30 * 24 * 60 * 60 * 1000);
+    
+    // Very old seasons (6+ months) - cache for a week
+    if (monthsAgo > 6) return LOCAL_CACHE.EXPIRY_OLD;
+    // Recently finished - cache for 2 hours
+    return LOCAL_CACHE.EXPIRY_RECENT;
+  }
+  // Future seasons
+  return LOCAL_CACHE.EXPIRY_CURRENT;
+}
 
 /**
  * Local Storage Cache Helper Functions
@@ -40,7 +97,8 @@ const localCache = {
         anime: animeList,
         timestamp: Date.now(),
         season,
-        year
+        year,
+        isFinished: isFinishedSeason(season, year)
       };
       localStorage.setItem(key, JSON.stringify(data));
       console.log(`💾 Cached ${animeList.length} anime for ${season} ${year}`);
@@ -56,8 +114,8 @@ const localCache = {
     }
   },
 
-  // Get anime list from local cache
-  get(season, year) {
+  // Get anime list from local cache (with smart expiry)
+  get(season, year, ignoreExpiry = false) {
     try {
       const key = this.getKey(season, year);
       const stored = localStorage.getItem(key);
@@ -66,10 +124,20 @@ const localCache = {
       
       const data = JSON.parse(stored);
       const age = Date.now() - data.timestamp;
+      const expiry = getCacheExpiry(season, year);
       
-      // Check if cache is expired
-      if (age > LOCAL_CACHE.EXPIRY) {
-        console.log(`⏰ Cache expired for ${season} ${year}`);
+      // For finished seasons, always return cache (refresh in background)
+      if (isFinishedSeason(season, year) || ignoreExpiry) {
+        const ageStr = age < 60000 ? `${Math.round(age/1000)}s` : 
+                       age < 3600000 ? `${Math.round(age/60000)}m` : 
+                       `${Math.round(age/3600000)}h`;
+        console.log(`⚡ Using cached data for ${season} ${year} (${ageStr} old, ${isFinishedSeason(season,year) ? 'finished' : 'active'})`);
+        return data.anime;
+      }
+      
+      // For current season, check expiry
+      if (age > expiry) {
+        console.log(`⏰ Cache expired for ${season} ${year} (current season)`);
         return null;
       }
       
@@ -81,9 +149,99 @@ const localCache = {
     }
   },
 
+  // Get raw cache data without expiry check
+  getRaw(season, year) {
+    try {
+      const key = this.getKey(season, year);
+      const stored = localStorage.getItem(key);
+      if (!stored) return null;
+      return JSON.parse(stored);
+    } catch (e) {
+      return null;
+    }
+  },
+
   // Check if cache exists and is valid
   has(season, year) {
     return this.get(season, year) !== null;
+  },
+
+  // Merge updates into cache (diff-based update)
+  mergeUpdates(season, year, freshAnime) {
+    try {
+      const key = this.getKey(season, year);
+      const stored = localStorage.getItem(key);
+      
+      if (!stored) {
+        // No existing cache, just save
+        this.save(season, year, freshAnime);
+        return { added: freshAnime.length, updated: 0, unchanged: 0 };
+      }
+      
+      const data = JSON.parse(stored);
+      const existingMap = new Map(data.anime.map(a => [a.id, a]));
+      
+      let added = 0;
+      let updated = 0;
+      let unchanged = 0;
+      
+      // Process each fresh anime
+      for (const fresh of freshAnime) {
+        const existing = existingMap.get(fresh.id);
+        
+        if (!existing) {
+          // New anime
+          existingMap.set(fresh.id, fresh);
+          added++;
+        } else if (this.hasChanges(existing, fresh)) {
+          // Update changed fields, but preserve local data like dub info
+          existingMap.set(fresh.id, {
+            ...existing,
+            ...fresh,
+            // Preserve dub data if we have it and Firebase doesn't
+            hasDub: fresh.hasDub !== undefined ? fresh.hasDub : existing.hasDub,
+            dubPlatforms: fresh.dubPlatforms?.length ? fresh.dubPlatforms : existing.dubPlatforms,
+            dubConfidence: fresh.dubConfidence !== undefined ? fresh.dubConfidence : existing.dubConfidence,
+            dubCheckedAt: fresh.dubCheckedAt || existing.dubCheckedAt
+          });
+          updated++;
+        } else {
+          unchanged++;
+        }
+      }
+      
+      // Convert back to array
+      const mergedAnime = Array.from(existingMap.values());
+      
+      // Save merged data
+      data.anime = mergedAnime;
+      data.timestamp = Date.now();
+      localStorage.setItem(key, JSON.stringify(data));
+      
+      console.log(`🔀 Merged ${season} ${year}: +${added} new, ~${updated} updated, ${unchanged} unchanged`);
+      return { added, updated, unchanged, anime: mergedAnime };
+    } catch (e) {
+      console.warn('Merge error:', e);
+      // Fallback to full save
+      this.save(season, year, freshAnime);
+      return { added: freshAnime.length, updated: 0, unchanged: 0 };
+    }
+  },
+
+  // Check if anime has meaningful changes
+  hasChanges(existing, fresh) {
+    // Fields that matter for updates
+    const compareFields = [
+      'status', 'episodes', 'score', 'popularity', 
+      'nextEpisode', 'nextEpisodeAt', 'coverImage'
+    ];
+    
+    for (const field of compareFields) {
+      if (existing[field] !== fresh[field]) {
+        return true;
+      }
+    }
+    return false;
   },
 
   // Update specific anime in cache
@@ -106,14 +264,25 @@ const localCache = {
     }
   },
 
-  // Remove oldest cache entries
+  // Remove oldest cache entries (but prefer keeping finished seasons)
   clearOldest(count = 2) {
     const entries = this.getAllEntries();
-    entries.sort((a, b) => a.timestamp - b.timestamp);
+    
+    // Sort: current seasons first (to remove), then by age
+    entries.sort((a, b) => {
+      const aFinished = isFinishedSeason(a.season, a.year);
+      const bFinished = isFinishedSeason(b.season, b.year);
+      
+      // Prefer keeping finished seasons
+      if (aFinished !== bFinished) return aFinished ? 1 : -1;
+      
+      // Otherwise by age
+      return a.timestamp - b.timestamp;
+    });
     
     for (let i = 0; i < Math.min(count, entries.length); i++) {
       localStorage.removeItem(entries[i].key);
-      console.log(`🗑️ Cleared old cache: ${entries[i].key}`);
+      console.log(`🗑️ Cleared cache: ${entries[i].key}`);
     }
   },
 
@@ -132,14 +301,15 @@ const localCache = {
     return entries;
   },
 
-  // Cleanup: remove expired and excess entries
+  // Cleanup: remove very old entries and excess
   cleanup() {
     const entries = this.getAllEntries();
     const now = Date.now();
     
-    // Remove expired
+    // Remove very old entries (30+ days)
+    const maxAge = 30 * 24 * 60 * 60 * 1000;
     entries.forEach(entry => {
-      if (now - entry.timestamp > LOCAL_CACHE.EXPIRY * 2) {
+      if (now - entry.timestamp > maxAge) {
         localStorage.removeItem(entry.key);
       }
     });
@@ -267,22 +437,28 @@ function setupEventListeners() {
 /**
  * Load anime with sync check - used when changing seasons
  * Now checks local cache first for instant loading
+ * Smart caching: finished seasons cached longer, diff-based updates
  */
 async function loadAnimeWithSync() {
   const grid = document.getElementById('animeGrid');
   
   // Check local cache first for instant display
-  const cachedAnime = localCache.get(currentSeason, currentYear);
+  // For finished seasons, always use cache if available (ignoreExpiry)
+  const useIgnoreExpiry = isFinishedSeason(currentSeason, currentYear);
+  const cachedAnime = localCache.get(currentSeason, currentYear, useIgnoreExpiry);
   
   if (cachedAnime && cachedAnime.length > 0) {
     // Instant display from cache!
-    console.log(`⚡ Instant load from cache: ${cachedAnime.length} anime`);
+    const seasonType = isFinishedSeason(currentSeason, currentYear) ? 'finished' : 
+                       isCurrentSeason(currentSeason, currentYear) ? 'current' : 'future';
+    console.log(`⚡ Instant load from cache: ${cachedAnime.length} anime (${seasonType} season)`);
     animeCache = cachedAnime;
     animeCache.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
     updateStats();
     renderAnimeGrid(animeCache);
     
     // Still refresh from Firebase in background for any updates
+    // (but the refresh function will skip if not needed for finished seasons)
     refreshFromFirebaseInBackground();
     return;
   }
@@ -324,10 +500,21 @@ async function loadAnimeWithSync() {
 }
 
 /**
- * Refresh data from Firebase in background (silent update)
+ * Refresh data from Firebase in background (silent update with diff-based merge)
  */
 async function refreshFromFirebaseInBackground() {
   try {
+    // For finished seasons, only refresh occasionally
+    const cacheData = localCache.getRaw(currentSeason, currentYear);
+    if (cacheData && isFinishedSeason(currentSeason, currentYear)) {
+      const age = Date.now() - cacheData.timestamp;
+      // Skip refresh for finished seasons if cache is less than 2 hours old
+      if (age < LOCAL_CACHE.EXPIRY_RECENT) {
+        console.log(`⏭️ Skipping background refresh for finished season (cache ${Math.round(age/60000)}m old)`);
+        return;
+      }
+    }
+
     const snapshot = await refs.anime
       .orderByChild('year')
       .equalTo(currentYear)
@@ -341,17 +528,16 @@ async function refreshFromFirebaseInBackground() {
       }
     });
 
-    // Check if there are any differences
-    if (freshAnime.length !== animeCache.length) {
-      console.log('🔄 Background refresh found updates');
-      animeCache = freshAnime;
+    // Use diff-based merge instead of full replacement
+    const mergeResult = localCache.mergeUpdates(currentSeason, currentYear, freshAnime);
+    
+    // Only re-render if there are actual changes
+    if (mergeResult.added > 0 || mergeResult.updated > 0) {
+      console.log('🔄 Background refresh found changes - updating display');
+      animeCache = mergeResult.anime || freshAnime;
       animeCache.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-      localCache.save(currentSeason, currentYear, animeCache);
       updateStats();
       renderAnimeGrid(animeCache);
-    } else {
-      // Update cache with fresh data anyway
-      localCache.save(currentSeason, currentYear, freshAnime);
     }
   } catch (error) {
     console.warn('Background refresh failed:', error);

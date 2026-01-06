@@ -2,6 +2,7 @@
  * Anime Tracker - Main Application
  * 
  * Serverless client-side app using Firebase Realtime Database
+ * with local caching for faster season switching
  */
 
 // State
@@ -14,6 +15,162 @@ let debounceTimer = null;
 // Season data
 const seasons = ['WINTER', 'SPRING', 'SUMMER', 'FALL'];
 const seasonNames = { WINTER: 'Winter', SPRING: 'Spring', SUMMER: 'Summer', FALL: 'Fall' };
+
+// Local Cache Configuration
+const LOCAL_CACHE = {
+  PREFIX: 'anime_cache_',
+  EXPIRY: 30 * 60 * 1000, // 30 minutes for local cache
+  MAX_SEASONS: 6 // Keep max 6 seasons cached to save storage
+};
+
+/**
+ * Local Storage Cache Helper Functions
+ */
+const localCache = {
+  // Get cache key for a season
+  getKey(season, year) {
+    return `${LOCAL_CACHE.PREFIX}${season}_${year}`;
+  },
+
+  // Save anime list to local cache
+  save(season, year, animeList) {
+    try {
+      const key = this.getKey(season, year);
+      const data = {
+        anime: animeList,
+        timestamp: Date.now(),
+        season,
+        year
+      };
+      localStorage.setItem(key, JSON.stringify(data));
+      console.log(`💾 Cached ${animeList.length} anime for ${season} ${year}`);
+      
+      // Cleanup old cache entries
+      this.cleanup();
+    } catch (e) {
+      console.warn('Local storage save error:', e);
+      // If quota exceeded, clear some old data
+      if (e.name === 'QuotaExceededError') {
+        this.clearOldest(3);
+      }
+    }
+  },
+
+  // Get anime list from local cache
+  get(season, year) {
+    try {
+      const key = this.getKey(season, year);
+      const stored = localStorage.getItem(key);
+      
+      if (!stored) return null;
+      
+      const data = JSON.parse(stored);
+      const age = Date.now() - data.timestamp;
+      
+      // Check if cache is expired
+      if (age > LOCAL_CACHE.EXPIRY) {
+        console.log(`⏰ Cache expired for ${season} ${year}`);
+        return null;
+      }
+      
+      console.log(`⚡ Using cached data for ${season} ${year} (${Math.round(age / 1000)}s old)`);
+      return data.anime;
+    } catch (e) {
+      console.warn('Local storage get error:', e);
+      return null;
+    }
+  },
+
+  // Check if cache exists and is valid
+  has(season, year) {
+    return this.get(season, year) !== null;
+  },
+
+  // Update specific anime in cache
+  updateAnime(season, year, updatedAnime) {
+    try {
+      const key = this.getKey(season, year);
+      const stored = localStorage.getItem(key);
+      
+      if (!stored) return;
+      
+      const data = JSON.parse(stored);
+      const idx = data.anime.findIndex(a => a.id === updatedAnime.id);
+      
+      if (idx !== -1) {
+        data.anime[idx] = { ...data.anime[idx], ...updatedAnime };
+        localStorage.setItem(key, JSON.stringify(data));
+      }
+    } catch (e) {
+      console.warn('Local storage update error:', e);
+    }
+  },
+
+  // Remove oldest cache entries
+  clearOldest(count = 2) {
+    const entries = this.getAllEntries();
+    entries.sort((a, b) => a.timestamp - b.timestamp);
+    
+    for (let i = 0; i < Math.min(count, entries.length); i++) {
+      localStorage.removeItem(entries[i].key);
+      console.log(`🗑️ Cleared old cache: ${entries[i].key}`);
+    }
+  },
+
+  // Get all cache entries with metadata
+  getAllEntries() {
+    const entries = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(LOCAL_CACHE.PREFIX)) {
+        try {
+          const data = JSON.parse(localStorage.getItem(key));
+          entries.push({ key, ...data });
+        } catch (e) {}
+      }
+    }
+    return entries;
+  },
+
+  // Cleanup: remove expired and excess entries
+  cleanup() {
+    const entries = this.getAllEntries();
+    const now = Date.now();
+    
+    // Remove expired
+    entries.forEach(entry => {
+      if (now - entry.timestamp > LOCAL_CACHE.EXPIRY * 2) {
+        localStorage.removeItem(entry.key);
+      }
+    });
+    
+    // Remove excess (keep only MAX_SEASONS)
+    const valid = this.getAllEntries();
+    if (valid.length > LOCAL_CACHE.MAX_SEASONS) {
+      this.clearOldest(valid.length - LOCAL_CACHE.MAX_SEASONS);
+    }
+  },
+
+  // Force refresh cache for a season
+  invalidate(season, year) {
+    const key = this.getKey(season, year);
+    localStorage.removeItem(key);
+    console.log(`🔄 Invalidated cache for ${season} ${year}`);
+  },
+
+  // Clear all anime cache
+  clearAll() {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(LOCAL_CACHE.PREFIX)) {
+        keys.push(key);
+      }
+    }
+    keys.forEach(key => localStorage.removeItem(key));
+    console.log(`🗑️ Cleared all ${keys.length} cached seasons`);
+  }
+};
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
@@ -109,13 +266,32 @@ function setupEventListeners() {
 
 /**
  * Load anime with sync check - used when changing seasons
+ * Now checks local cache first for instant loading
  */
 async function loadAnimeWithSync() {
   const grid = document.getElementById('animeGrid');
-  grid.innerHTML = '<div class="loading">Checking for updates...</div>';
+  
+  // Check local cache first for instant display
+  const cachedAnime = localCache.get(currentSeason, currentYear);
+  
+  if (cachedAnime && cachedAnime.length > 0) {
+    // Instant display from cache!
+    console.log(`⚡ Instant load from cache: ${cachedAnime.length} anime`);
+    animeCache = cachedAnime;
+    animeCache.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    updateStats();
+    renderAnimeGrid(animeCache);
+    
+    // Still refresh from Firebase in background for any updates
+    refreshFromFirebaseInBackground();
+    return;
+  }
+  
+  // No cache - load from Firebase
+  grid.innerHTML = '<div class="loading">Loading anime...</div>';
 
   try {
-    // Check if we have data for this season
+    // Check if we have data for this season in Firebase
     const snapshot = await refs.anime
       .orderByChild('year')
       .equalTo(currentYear)
@@ -148,14 +324,64 @@ async function loadAnimeWithSync() {
 }
 
 /**
- * Load anime from Firebase
+ * Refresh data from Firebase in background (silent update)
+ */
+async function refreshFromFirebaseInBackground() {
+  try {
+    const snapshot = await refs.anime
+      .orderByChild('year')
+      .equalTo(currentYear)
+      .once('value');
+
+    const freshAnime = [];
+    snapshot.forEach(child => {
+      const anime = { id: child.key, ...child.val() };
+      if (anime.season === currentSeason) {
+        freshAnime.push(anime);
+      }
+    });
+
+    // Check if there are any differences
+    if (freshAnime.length !== animeCache.length) {
+      console.log('🔄 Background refresh found updates');
+      animeCache = freshAnime;
+      animeCache.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+      localCache.save(currentSeason, currentYear, animeCache);
+      updateStats();
+      renderAnimeGrid(animeCache);
+    } else {
+      // Update cache with fresh data anyway
+      localCache.save(currentSeason, currentYear, freshAnime);
+    }
+  } catch (error) {
+    console.warn('Background refresh failed:', error);
+  }
+}
+
+/**
+ * Load anime from Firebase and save to local cache
  */
 async function loadAnime() {
   const grid = document.getElementById('animeGrid');
+  
+  // Check local cache first
+  const cachedAnime = localCache.get(currentSeason, currentYear);
+  if (cachedAnime && cachedAnime.length > 0) {
+    console.log(`⚡ Using cached anime: ${cachedAnime.length} titles`);
+    animeCache = cachedAnime;
+    animeCache.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    updateStats();
+    renderAnimeGrid(animeCache);
+    
+    // Check dubs in background (don't await)
+    setTimeout(() => checkDubsInBackground(), 2000);
+    return;
+  }
+  
   grid.innerHTML = '<div class="loading">Loading anime...</div>';
 
   try {
-    // Query anime for current season
+    // Query anime for current season from Firebase
     const snapshot = await refs.anime
       .orderByChild('year')
       .equalTo(currentYear)
@@ -172,6 +398,9 @@ async function loadAnime() {
 
     // Sort by popularity by default
     animeCache.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+
+    // Save to local cache for fast switching
+    localCache.save(currentSeason, currentYear, animeCache);
 
     // Update stats
     updateStats();
@@ -394,6 +623,8 @@ async function checkDubsInBackground() {
 
   console.log(`🎬 Checking dubs for ${needsCheck.length} anime...`);
 
+  let updated = false;
+
   // Check in batches to avoid rate limiting
   const batchSize = 5;
   for (let i = 0; i < needsCheck.length; i += batchSize) {
@@ -402,12 +633,17 @@ async function checkDubsInBackground() {
     await Promise.all(batch.map(async anime => {
       try {
         const result = await dubChecker.checkDub(anime);
-        // Update local cache
+        // Update memory cache
         const idx = animeCache.findIndex(a => a.id === anime.id);
         if (idx !== -1) {
           animeCache[idx].hasDub = result.hasDub;
           animeCache[idx].dubPlatforms = result.platforms;
           animeCache[idx].dubConfidence = result.confidence;
+          animeCache[idx].dubCheckedAt = Date.now();
+          updated = true;
+          
+          // Update local storage cache for this anime
+          localCache.updateAnime(currentSeason, currentYear, animeCache[idx]);
         }
       } catch (err) {
         console.error(`Dub check failed for ${anime.title}:`, err);
@@ -419,8 +655,12 @@ async function checkDubsInBackground() {
   }
 
   // Update stats and re-render to show dub badges
-  updateStats();
-  filterAnime();
+  if (updated) {
+    updateStats();
+    filterAnime();
+    // Save full cache update
+    localCache.save(currentSeason, currentYear, animeCache);
+  }
   console.log('✅ Dub check complete');
 }
 

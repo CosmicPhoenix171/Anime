@@ -949,6 +949,9 @@ class AnimeSync {
         romaji: jikanData.title,
         native: jikanData.title_japanese
       },
+      // Alternative titles from MAL
+      titleSynonyms: jikanData.title_synonyms || [],
+      titles: jikanData.titles || [], // Array of {type, title} objects
       season: season,
       seasonYear: seasonYear,
       status: statusMap[jikanData.status] || 'RELEASING',
@@ -1229,6 +1232,9 @@ class AnimeSync {
       titleRomaji: jikanData.title.romaji,
       titleEnglish: jikanData.title.english,
       titleNative: jikanData.title.native,
+      // Alternative titles from MAL
+      titleSynonyms: jikanData.titleSynonyms || [],
+      altTitles: jikanData.titles?.map(t => ({ type: t.type, title: t.title })) || [],
       season: jikanData.season,
       year: jikanData.seasonYear,
       status: jikanData.status,

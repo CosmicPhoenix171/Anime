@@ -691,11 +691,21 @@ function filterAnime() {
   }
 
   if (searchQuery) {
-    filtered = filtered.filter(a => 
-      a.title?.toLowerCase().includes(searchQuery) ||
-      a.titleRomaji?.toLowerCase().includes(searchQuery) ||
-      a.titleEnglish?.toLowerCase().includes(searchQuery)
-    );
+    filtered = filtered.filter(a => {
+      // Search main titles
+      if (a.title?.toLowerCase().includes(searchQuery)) return true;
+      if (a.titleRomaji?.toLowerCase().includes(searchQuery)) return true;
+      if (a.titleEnglish?.toLowerCase().includes(searchQuery)) return true;
+      if (a.titleNative?.toLowerCase().includes(searchQuery)) return true;
+      
+      // Search synonyms (alternative titles from MAL)
+      if (a.titleSynonyms?.some(syn => syn.toLowerCase().includes(searchQuery))) return true;
+      
+      // Search all alternative titles
+      if (a.altTitles?.some(alt => alt.title?.toLowerCase().includes(searchQuery))) return true;
+      
+      return false;
+    });
   }
 
   // Apply sort

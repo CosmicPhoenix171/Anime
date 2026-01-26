@@ -991,7 +991,11 @@ class AnimeSync {
 
       for (let i = 0; i < enrichedAnime.length; i++) {
         const anime = enrichedAnime[i];
-        const result = await this.saveEnrichedAnime(anime);
+        // Force the synced season/year if the anime doesn't have one
+        if (!anime.season) anime.season = season;
+        if (!anime.year) anime.year = year;
+        
+        const result = await this.saveEnrichedAnime(anime, season, year);
 
         if (result.isNew) added++;
         else updated++;
@@ -1085,7 +1089,7 @@ class AnimeSync {
   /**
    * Save enriched anime to Firebase
    */
-  async saveEnrichedAnime(enrichedAnime) {
+  async saveEnrichedAnime(enrichedAnime, syncedSeason = null, syncedYear = null) {
     // Determine canonical Firebase ID
     let animeId;
     if (enrichedAnime.anilistId) {
@@ -1106,6 +1110,10 @@ class AnimeSync {
     const existingSnapshot = await refs.anime.child(animeId).once('value');
     const existing = existingSnapshot.val() || {};
 
+    // Use synced season/year as fallback if API data is missing
+    const finalSeason = enrichedAnime.season || existing.season || syncedSeason;
+    const finalYear = enrichedAnime.year || existing.year || syncedYear;
+
     const animeData = {
       // IDs
       anilistId: enrichedAnime.anilistId || existing.anilistId || null,
@@ -1121,9 +1129,9 @@ class AnimeSync {
       synonyms: enrichedAnime.synonyms || existing.synonyms || [],
       altTitles: enrichedAnime.altTitles || existing.altTitles || [],
 
-      // Season
-      season: enrichedAnime.season || existing.season,
-      year: enrichedAnime.year || existing.year,
+      // Season - ensure we always have season/year
+      season: finalSeason,
+      year: finalYear,
       status: enrichedAnime.status || existing.status,
       format: enrichedAnime.format || existing.format,
 

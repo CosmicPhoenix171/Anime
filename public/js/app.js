@@ -769,6 +769,9 @@ function createAnimeCard(anime) {
       🎙️ DUB
     </span>` : '';
 
+  // Rating badge
+  const ratingBadge = getRatingBadge(anime.rating);
+
   return `
     <a href="./anime.html?id=${anime.id}" class="anime-card">
       <div class="card-image">
@@ -776,6 +779,7 @@ function createAnimeCard(anime) {
         ${score ? `<span class="card-score">⭐ ${score}%</span>` : ''}
         ${dubBadge}
         <span class="card-status ${statusClass}">${statusText}</span>
+        ${ratingBadge}
         ${currentUser ? `<button class="card-add-btn" onclick="event.preventDefault(); event.stopPropagation(); addToList('${anime.id}')" title="Add to list">+</button>` : ''}
       </div>
       <div class="card-body">
@@ -815,6 +819,44 @@ function formatStatus(status) {
     case 'HIATUS': return 'Hiatus';
     default: return status;
   }
+}
+
+/**
+ * Get rating badge HTML
+ */
+function getRatingBadge(rating) {
+  if (!rating) return '';
+  
+  const ratingLower = rating.toLowerCase();
+  let ratingClass = '';
+  let ratingText = rating;
+  
+  // Normalize rating display
+  if (ratingLower.includes('g -') || ratingLower === 'g') {
+    ratingClass = 'rating-g';
+    ratingText = 'G';
+  } else if (ratingLower.includes('pg -') || ratingLower === 'pg') {
+    ratingClass = 'rating-pg';
+    ratingText = 'PG';
+  } else if (ratingLower.includes('pg-13') || ratingLower.includes('pg13')) {
+    ratingClass = 'rating-pg13';
+    ratingText = 'PG-13';
+  } else if (ratingLower.includes('r -') || ratingLower === 'r') {
+    ratingClass = 'rating-r';
+    ratingText = 'R';
+  } else if (ratingLower.includes('r+') || ratingLower.includes('r17') || ratingLower.includes('17+')) {
+    ratingClass = 'rating-r17';
+    ratingText = 'R-17';
+  } else if (ratingLower.includes('rx') || ratingLower.includes('hentai')) {
+    ratingClass = 'rating-rx';
+    ratingText = 'Rx';
+  } else {
+    // Unknown rating, show first few chars
+    ratingClass = 'rating-pg';
+    ratingText = rating.substring(0, 6);
+  }
+  
+  return `<span class="card-rating ${ratingClass}" title="${rating}">${ratingText}</span>`;
 }
 
 /**

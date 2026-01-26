@@ -55,7 +55,9 @@ class AnimeSync {
       producers: ['jikan'],
       themes: ['jikan'],
       demographics: ['jikan'],
-      isAdult: ['anilist', 'jikan', 'kitsu']
+      isAdult: ['anilist', 'jikan', 'kitsu'],
+      rating: ['jikan', 'kitsu', 'anilist'],
+      ageRating: ['kitsu', 'jikan']
     };
   }
 
@@ -724,6 +726,8 @@ class AnimeSync {
         thumbnail: anilist.trailer.thumbnail
       } : null,
       isAdult: anilist.isAdult || false,
+      // AniList doesn't have explicit rating, derive from isAdult
+      rating: anilist.isAdult ? 'Rx - Hentai' : null,
       countryOfOrigin: anilist.countryOfOrigin,
       source: 'anilist'
     };
@@ -841,8 +845,35 @@ class AnimeSync {
       endDate: attrs.endDate,
       isAdult: attrs.nsfw || false,
       ageRating: attrs.ageRating,
+      // Convert Kitsu ageRating to standardized format
+      rating: this.convertKitsuRating(attrs.ageRating, attrs.ageRatingGuide),
       source: 'kitsu'
     };
+  }
+
+  /**
+   * Convert Kitsu age rating to standardized format
+   */
+  convertKitsuRating(ageRating, ageRatingGuide) {
+    if (!ageRating) return null;
+    
+    const ratingMap = {
+      'G': 'G - All Ages',
+      'PG': 'PG - Children',
+      'R': 'R - 17+ (violence & profanity)',
+      'R18': 'Rx - Hentai'
+    };
+    
+    if (ratingMap[ageRating]) {
+      return ratingMap[ageRating];
+    }
+    
+    // Include guide if available
+    if (ageRatingGuide) {
+      return `${ageRating} - ${ageRatingGuide}`;
+    }
+    
+    return ageRating;
   }
 
   /**
@@ -1307,6 +1338,10 @@ class AnimeSync {
 
       // Flags
       isAdult: enrichedAnime.isAdult ?? existing.isAdult ?? false,
+
+      // Rating (age rating from all APIs)
+      rating: enrichedAnime.rating || existing.rating || null,
+      ageRating: enrichedAnime.ageRating || existing.ageRating || null,
 
       // Metadata
       _enrichedFrom: enrichedAnime._enrichedFrom || [],

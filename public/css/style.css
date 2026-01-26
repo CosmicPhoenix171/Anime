@@ -335,6 +335,50 @@ body {
   color: white;
 }
 
+/* Rating Badge - Bottom Right */
+.card-rating {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  backdrop-filter: blur(4px);
+}
+
+.card-rating.rating-g {
+  background: rgba(76, 175, 80, 0.9);
+  color: white;
+}
+
+.card-rating.rating-pg {
+  background: rgba(33, 150, 243, 0.9);
+  color: white;
+}
+
+.card-rating.rating-pg13 {
+  background: rgba(255, 193, 7, 0.9);
+  color: #333;
+}
+
+.card-rating.rating-r {
+  background: rgba(255, 152, 0, 0.9);
+  color: white;
+}
+
+.card-rating.rating-r17 {
+  background: rgba(244, 67, 54, 0.9);
+  color: white;
+}
+
+.card-rating.rating-rx {
+  background: rgba(156, 39, 176, 0.9);
+  color: white;
+}
+
 /* Add Button */
 .card-add-btn {
   position: absolute;

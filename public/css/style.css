@@ -450,28 +450,37 @@ body {
   color: #888;
 }
 
-.card-next-ep {
-  font-size: 0.7rem;
-  color: #4caf50;
-  font-weight: 600;
-  margin-top: 6px;
-  padding: 4px 8px;
-  background: #e8f5e9;
-  border-radius: 4px;
-  display: inline-block;
-}
-
-/* Episode Progress Bar */
-.card-episode-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* Combined Episode Section */
+.card-episode-section {
   margin-top: 8px;
 }
 
+.episode-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.episode-countdown {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #4caf50;
+}
+
+.episode-count {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #666;
+}
+
+.episode-count-solo {
+  font-size: 0.75rem;
+  color: #888;
+}
+
 .episode-progress-bar {
-  flex: 1;
-  height: 6px;
+  height: 5px;
   background: #e0e0e0;
   border-radius: 3px;
   overflow: hidden;
@@ -482,13 +491,6 @@ body {
   background: linear-gradient(90deg, #667eea, #764ba2);
   border-radius: 3px;
   transition: width 0.3s ease;
-}
-
-.episode-progress-text {
-  font-size: 0.65rem;
-  font-weight: 600;
-  color: #666;
-  white-space: nowrap;
 }
 
 .card-studio {

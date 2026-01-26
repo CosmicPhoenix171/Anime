@@ -1031,7 +1031,102 @@ function showError(message) {
  */
 function showPage(page) {
   console.log('Navigate to:', page);
-  // TODO: Implement SPA navigation or separate pages
+  
+  // Update nav links
+  document.querySelectorAll('.nav-links a').forEach(link => {
+    link.classList.remove('active');
+    if (link.getAttribute('href') === `#${page}`) {
+      link.classList.add('active');
+    }
+  });
+  
+  const seasonHeader = document.querySelector('.season-header');
+  const seasonNav = document.querySelector('.season-nav');
+  
+  switch (page) {
+    case 'all-airing':
+      // Show all currently airing anime regardless of season
+      loadAllAiringAnime();
+      if (seasonNav) seasonNav.style.display = 'none';
+      document.getElementById('seasonTitle').textContent = '📺 All Currently Airing';
+      break;
+      
+    case 'recently-finished':
+      // Load previous season's finished anime
+      const prev = animeSync.getPreviousSeason();
+      currentSeason = prev.season;
+      currentYear = prev.year;
+      if (seasonNav) seasonNav.style.display = 'flex';
+      loadAnime();
+      break;
+      
+    case 'dub-radar':
+      // Show only dubbed anime
+      loadAllAiringAnime(true); // true = dubs only
+      if (seasonNav) seasonNav.style.display = 'none';
+      document.getElementById('seasonTitle').textContent = '🎙️ Dub Radar - All Dubbed';
+      break;
+      
+    default:
+      // Current season view
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      currentSeason = ['WINTER', 'SPRING', 'SUMMER', 'FALL'][Math.floor((month - 1) / 3)];
+      currentYear = now.getFullYear();
+      if (seasonNav) seasonNav.style.display = 'flex';
+      loadAnime();
+      
+      // Set home as active
+      document.querySelectorAll('.nav-links a').forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === './') {
+          link.classList.add('active');
+        }
+      });
+  }
+}
+
+/**
+ * Load ALL currently airing anime (across all seasons)
+ */
+async function loadAllAiringAnime(dubsOnly = false) {
+  const grid = document.getElementById('animeGrid');
+  grid.innerHTML = '<div class="loading">Loading all airing anime...</div>';
+  
+  try {
+    // Query all anime with RELEASING status
+    const snapshot = await refs.anime.orderByChild('status').equalTo('RELEASING').once('value');
+    
+    animeCache = [];
+    snapshot.forEach(child => {
+      const anime = { id: child.key, ...child.val() };
+      // Filter out adult content by default
+      const showAdult = document.getElementById('adultFilter')?.checked || false;
+      if (!showAdult && anime.isAdult) return;
+      
+      // If dubs only, filter for dubs
+      if (dubsOnly && !anime.hasDub) return;
+      
+      animeCache.push(anime);
+    });
+    
+    // Sort by popularity
+    animeCache.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    
+    // Update stats
+    const airingCount = animeCache.length;
+    const dubbedCount = animeCache.filter(a => a.hasDub).length;
+    document.getElementById('statTotal').textContent = animeCache.length;
+    document.getElementById('statAiring').textContent = airingCount;
+    document.getElementById('statDubbed').textContent = dubbedCount;
+    
+    // Render
+    filterAnime();
+    
+  } catch (error) {
+    console.error('Error loading airing anime:', error);
+    grid.innerHTML = '<div class="error">Error loading anime. Please try again.</div>';
+  }
 }
 
 // Force sync (for debugging)

@@ -37,6 +37,16 @@ class AnimeSync {
     return { season: seasons[idx + 1], year: this.getCurrentYear() };
   }
 
+  getPreviousSeason() {
+    const seasons = ['WINTER', 'SPRING', 'SUMMER', 'FALL'];
+    const current = this.getCurrentSeason();
+    const idx = seasons.indexOf(current);
+    if (idx === 0) {
+      return { season: 'FALL', year: this.getCurrentYear() - 1 };
+    }
+    return { season: seasons[idx - 1], year: this.getCurrentYear() };
+  }
+
   /**
    * Check if sync is needed based on last sync time
    */
@@ -122,49 +132,100 @@ class AnimeSync {
 
   /**
    * Full season sync - fetches all anime for current and next season
+   * PLUS all currently airing anime regardless of original season
    */
   async fullSeasonSync() {
     const season = this.getCurrentSeason();
     const year = this.getCurrentYear();
     const nextSeason = this.getNextSeason();
+    const prevSeason = this.getPreviousSeason();
 
     let added = 0;
     let updated = 0;
+    const seenIds = new Set();
 
-    // Fetch current season
-    this.updateProgress(10, `Fetching ${season} ${year} anime...`);
+    // 1. Fetch ALL currently airing anime (regardless of season)
+    this.updateProgress(5, 'Fetching all currently airing anime...');
+    const airingAnime = await this.fetchAllAiringAnime();
+    
+    this.updateProgress(15, `Processing ${airingAnime.length} airing anime...`);
+    for (let i = 0; i < airingAnime.length; i++) {
+      if (!seenIds.has(airingAnime[i].id)) {
+        seenIds.add(airingAnime[i].id);
+        const result = await this.saveAnime(airingAnime[i]);
+        if (result.isNew) added++;
+        else updated++;
+      }
+      if (i % 10 === 0) {
+        this.updateProgress(15 + (i / airingAnime.length) * 15, 
+          `Saving airing ${i + 1}/${airingAnime.length}...`);
+      }
+    }
+
+    // 2. Fetch current season
+    this.updateProgress(30, `Fetching ${season} ${year} anime...`);
     const currentAnime = await this.fetchSeasonAnime(season, year);
     
-    this.updateProgress(30, `Saving ${currentAnime.length} anime...`);
+    this.updateProgress(40, `Saving ${currentAnime.length} current season anime...`);
     for (let i = 0; i < currentAnime.length; i++) {
-      const result = await this.saveAnime(currentAnime[i]);
-      if (result.isNew) added++;
-      else updated++;
-      
+      if (!seenIds.has(currentAnime[i].id)) {
+        seenIds.add(currentAnime[i].id);
+        const result = await this.saveAnime(currentAnime[i]);
+        if (result.isNew) added++;
+        else updated++;
+      }
       if (i % 10 === 0) {
-        this.updateProgress(30 + (i / currentAnime.length) * 30, 
+        this.updateProgress(40 + (i / currentAnime.length) * 15, 
           `Saving anime ${i + 1}/${currentAnime.length}...`);
       }
     }
 
-    // Fetch next season
-    this.updateProgress(60, `Fetching ${nextSeason.season} ${nextSeason.year} anime...`);
+    // 3. Fetch previous season (for recently finished or continuing)
+    this.updateProgress(55, `Fetching ${prevSeason.season} ${prevSeason.year} anime...`);
+    const prevAnime = await this.fetchSeasonAnime(prevSeason.season, prevSeason.year);
+    
+    this.updateProgress(60, `Saving ${prevAnime.length} previous season anime...`);
+    for (let i = 0; i < prevAnime.length; i++) {
+      if (!seenIds.has(prevAnime[i].id)) {
+        seenIds.add(prevAnime[i].id);
+        const result = await this.saveAnime(prevAnime[i]);
+        if (result.isNew) added++;
+        else updated++;
+      }
+    }
+
+    // 4. Fetch next season
+    this.updateProgress(70, `Fetching ${nextSeason.season} ${nextSeason.year} anime...`);
     const upcomingAnime = await this.fetchSeasonAnime(nextSeason.season, nextSeason.year);
     
-    this.updateProgress(70, `Saving ${upcomingAnime.length} upcoming anime...`);
+    this.updateProgress(80, `Saving ${upcomingAnime.length} upcoming anime...`);
     for (let i = 0; i < upcomingAnime.length; i++) {
-      const result = await this.saveAnime(upcomingAnime[i]);
-      if (result.isNew) added++;
-      else updated++;
-      
+      if (!seenIds.has(upcomingAnime[i].id)) {
+        seenIds.add(upcomingAnime[i].id);
+        const result = await this.saveAnime(upcomingAnime[i]);
+        if (result.isNew) added++;
+        else updated++;
+      }
       if (i % 10 === 0) {
-        this.updateProgress(70 + (i / upcomingAnime.length) * 25, 
+        this.updateProgress(80 + (i / upcomingAnime.length) * 15, 
           `Saving upcoming ${i + 1}/${upcomingAnime.length}...`);
       }
     }
 
-    console.log(`✅ Full sync complete: ${added} added, ${updated} updated`);
-    return { added, updated, total: currentAnime.length + upcomingAnime.length };
+    // 5. Fetch anime without season but starting this year
+    this.updateProgress(95, 'Checking for anime without season tags...');
+    const noSeasonAnime = await this.fetchAnimeByStartDate(year);
+    for (const anime of noSeasonAnime) {
+      if (!seenIds.has(anime.id)) {
+        seenIds.add(anime.id);
+        const result = await this.saveAnime(anime);
+        if (result.isNew) added++;
+        else updated++;
+      }
+    }
+
+    console.log(`✅ Full sync complete: ${added} added, ${updated} updated, ${seenIds.size} total`);
+    return { added, updated, total: seenIds.size };
   }
 
   /**
@@ -202,47 +263,58 @@ class AnimeSync {
   }
 
   /**
-   * Daily update - checks all airing anime for updates
+   * Daily update - checks all airing anime for updates AND fetches new releases
    */
   async dailyUpdate() {
-    this.updateProgress(10, 'Checking airing anime...');
+    this.updateProgress(5, 'Fetching latest airing anime...');
     
-    // Get airing anime from database
-    const snapshot = await refs.anime.orderByChild('status').equalTo('RELEASING').once('value');
-    const airingAnime = [];
-    snapshot.forEach(child => {
-      airingAnime.push({ id: child.key, ...child.val() });
-    });
+    // First, fetch all currently airing from AniList (catches new releases)
+    const freshAiring = await this.fetchAllAiringAnime();
+    const seenIds = new Set();
+    let added = 0;
+    let updated = 0;
 
-    if (airingAnime.length === 0) {
-      // No airing anime in DB, do full sync
-      return this.fullSeasonSync();
+    this.updateProgress(30, `Processing ${freshAiring.length} airing anime...`);
+    for (let i = 0; i < freshAiring.length; i++) {
+      if (!seenIds.has(freshAiring[i].id)) {
+        seenIds.add(freshAiring[i].id);
+        const result = await this.saveAnime(freshAiring[i]);
+        if (result.isNew) added++;
+        else updated++;
+      }
+      if (i % 20 === 0) {
+        this.updateProgress(30 + (i / freshAiring.length) * 50, 
+          `Updating ${i + 1}/${freshAiring.length}...`);
+      }
     }
 
-    let updated = 0;
-    const total = airingAnime.length;
+    // Also update anime in DB that are marked as airing but might have finished
+    this.updateProgress(80, 'Checking database for status changes...');
+    const snapshot = await refs.anime.orderByChild('status').equalTo('RELEASING').once('value');
+    const dbAiring = [];
+    snapshot.forEach(child => {
+      const anime = child.val();
+      if (!seenIds.has(anime.anilistId)) {
+        dbAiring.push({ id: child.key, ...anime });
+      }
+    });
 
-    for (let i = 0; i < airingAnime.length; i++) {
-      const anime = airingAnime[i];
+    // Check these anime that weren't in the fresh airing list (might have finished)
+    for (let i = 0; i < Math.min(dbAiring.length, 20); i++) {
       try {
-        const freshData = await this.fetchAnimeById(anime.anilistId);
+        const freshData = await this.fetchAnimeById(dbAiring[i].anilistId);
         if (freshData) {
           await this.saveAnime(freshData);
           updated++;
         }
         await this.sleep(this.RATE_LIMIT_MS);
       } catch (error) {
-        console.warn(`Failed to update ${anime.title}:`, error.message);
-      }
-
-      if (i % 5 === 0) {
-        this.updateProgress(10 + (i / total) * 85, 
-          `Updating ${i + 1}/${total} airing anime...`);
+        console.warn(`Failed to update ${dbAiring[i].title}:`, error.message);
       }
     }
 
-    console.log(`✅ Daily update complete: ${updated} updated`);
-    return { updated, total };
+    console.log(`✅ Daily update complete: ${added} added, ${updated} updated, ${seenIds.size} total airing`);
+    return { added, updated, total: seenIds.size };
   }
 
   /**
@@ -392,6 +464,214 @@ class AnimeSync {
   }
 
   /**
+   * Fetch ALL currently airing anime (regardless of season)
+   * This catches long-running shows, multi-cour anime, and continuing series
+   */
+  async fetchAllAiringAnime() {
+    const allAnime = [];
+    let page = 1;
+    let hasNextPage = true;
+
+    while (hasNextPage) {
+      const query = `
+        query ($page: Int) {
+          Page(page: $page, perPage: 50) {
+            pageInfo {
+              hasNextPage
+              currentPage
+            }
+            media(status: RELEASING, type: ANIME, sort: POPULARITY_DESC, countryOfOrigin: JP) {
+              id
+              idMal
+              isAdult
+              title {
+                romaji
+                english
+                native
+              }
+              season
+              seasonYear
+              status
+              episodes
+              nextAiringEpisode {
+                episode
+                airingAt
+              }
+              format
+              genres
+              averageScore
+              popularity
+              coverImage {
+                large
+                medium
+                color
+              }
+              bannerImage
+              description
+              studios(isMain: true) {
+                nodes {
+                  name
+                }
+              }
+              startDate {
+                year
+                month
+                day
+              }
+              endDate {
+                year
+                month
+                day
+              }
+            }
+          }
+        }
+      `;
+
+      try {
+        const response = await fetch(this.ANILIST_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query,
+            variables: { page }
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.errors) {
+          console.error('AniList API error:', data.errors);
+          break;
+        }
+
+        const pageData = data.data.Page;
+        allAnime.push(...pageData.media);
+        hasNextPage = pageData.pageInfo.hasNextPage;
+        page++;
+
+        await this.sleep(this.RATE_LIMIT_MS);
+      } catch (error) {
+        console.error('Fetch error:', error);
+        break;
+      }
+    }
+
+    console.log(`📡 Fetched ${allAnime.length} currently airing anime`);
+    return allAnime;
+  }
+
+  /**
+   * Fetch anime by start date year (catches anime without season tags)
+   * These are anime that started this year but weren't assigned to a specific season
+   */
+  async fetchAnimeByStartDate(year) {
+    const allAnime = [];
+    let page = 1;
+    let hasNextPage = true;
+    const maxPages = 5; // Limit pages for this supplementary query
+
+    while (hasNextPage && page <= maxPages) {
+      const query = `
+        query ($page: Int, $startDateGreater: FuzzyDateInt, $startDateLess: FuzzyDateInt) {
+          Page(page: $page, perPage: 50) {
+            pageInfo {
+              hasNextPage
+              currentPage
+            }
+            media(
+              type: ANIME, 
+              sort: POPULARITY_DESC, 
+              countryOfOrigin: JP,
+              startDate_greater: $startDateGreater,
+              startDate_lesser: $startDateLess,
+              season: null
+            ) {
+              id
+              idMal
+              isAdult
+              title {
+                romaji
+                english
+                native
+              }
+              season
+              seasonYear
+              status
+              episodes
+              nextAiringEpisode {
+                episode
+                airingAt
+              }
+              format
+              genres
+              averageScore
+              popularity
+              coverImage {
+                large
+                medium
+                color
+              }
+              bannerImage
+              description
+              studios(isMain: true) {
+                nodes {
+                  name
+                }
+              }
+              startDate {
+                year
+                month
+                day
+              }
+              endDate {
+                year
+                month
+                day
+              }
+            }
+          }
+        }
+      `;
+
+      try {
+        const response = await fetch(this.ANILIST_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query,
+            variables: { 
+              page,
+              startDateGreater: (year - 1) * 10000 + 1201, // Dec 1 of previous year
+              startDateLess: (year + 1) * 10000 + 101      // Jan 1 of next year
+            }
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.errors) {
+          console.error('AniList API error:', data.errors);
+          break;
+        }
+
+        const pageData = data.data.Page;
+        allAnime.push(...pageData.media);
+        hasNextPage = pageData.pageInfo.hasNextPage;
+        page++;
+
+        await this.sleep(this.RATE_LIMIT_MS);
+      } catch (error) {
+        console.error('Fetch error:', error);
+        break;
+      }
+    }
+
+    console.log(`📡 Fetched ${allAnime.length} anime without season tags from ${year}`);
+    return allAnime;
+  }
+
+  /**
    * Fetch single anime by AniList ID
    */
   async fetchAnimeById(anilistId) {
@@ -400,6 +680,7 @@ class AnimeSync {
         Media(id: $id, type: ANIME) {
           id
           idMal
+          isAdult
           title {
             romaji
             english

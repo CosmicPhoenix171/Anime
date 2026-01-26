@@ -7,8 +7,17 @@
 
 class AnimeSync {
   constructor() {
+    // AniList API (primary source)
     this.ANILIST_API = 'https://graphql.anilist.co';
+    
+    // Jikan API v4 (MyAnimeList data - secondary source)
+    this.JIKAN_API = 'https://api.jikan.moe/v4';
+    
+    // Kitsu API (tertiary source)
+    this.KITSU_API = 'https://kitsu.io/api/edge';
+    
     this.RATE_LIMIT_MS = 800; // AniList rate limit
+    this.JIKAN_RATE_LIMIT_MS = 1000; // Jikan rate limit (more strict)
     this.onProgress = null;
   }
 
@@ -811,6 +820,496 @@ class AnimeSync {
     const month = dateObj.month ? String(dateObj.month).padStart(2, '0') : '01';
     const day = dateObj.day ? String(dateObj.day).padStart(2, '0') : '01';
     return `${dateObj.year}-${month}-${day}`;
+  }
+
+  /**
+   * Convert season name to Jikan format
+   */
+  getJikanSeason(season) {
+    return season.toLowerCase(); // winter, spring, summer, fall
+  }
+
+  /**
+   * Fetch anime from Jikan API (MyAnimeList data)
+   * This catches anime that might not be on AniList
+   */
+  async fetchJikanSeasonAnime(season, year) {
+    const allAnime = [];
+    let page = 1;
+    let hasNextPage = true;
+    const jikanSeason = this.getJikanSeason(season);
+
+    this.updateProgress(0, `Fetching from MyAnimeList (${season} ${year})...`);
+
+    while (hasNextPage && page <= 5) { // Limit to 5 pages
+      try {
+        const response = await fetch(
+          `${this.JIKAN_API}/seasons/${year}/${jikanSeason}?page=${page}&filter=tv`
+        );
+        
+        if (!response.ok) {
+          console.warn(`Jikan API error: ${response.status}`);
+          break;
+        }
+
+        const data = await response.json();
+        
+        if (data.data) {
+          allAnime.push(...data.data);
+        }
+        
+        hasNextPage = data.pagination?.has_next_page || false;
+        page++;
+
+        await this.sleep(this.JIKAN_RATE_LIMIT_MS);
+      } catch (error) {
+        console.error('Jikan fetch error:', error);
+        break;
+      }
+    }
+
+    console.log(`📡 Jikan: Fetched ${allAnime.length} anime for ${season} ${year}`);
+    return allAnime;
+  }
+
+  /**
+   * Fetch currently airing anime from Jikan
+   */
+  async fetchJikanAiringAnime() {
+    const allAnime = [];
+    let page = 1;
+    let hasNextPage = true;
+
+    while (hasNextPage && page <= 5) {
+      try {
+        const response = await fetch(
+          `${this.JIKAN_API}/seasons/now?page=${page}`
+        );
+        
+        if (!response.ok) break;
+
+        const data = await response.json();
+        
+        if (data.data) {
+          allAnime.push(...data.data);
+        }
+        
+        hasNextPage = data.pagination?.has_next_page || false;
+        page++;
+
+        await this.sleep(this.JIKAN_RATE_LIMIT_MS);
+      } catch (error) {
+        console.error('Jikan airing fetch error:', error);
+        break;
+      }
+    }
+
+    console.log(`📡 Jikan: Fetched ${allAnime.length} currently airing anime`);
+    return allAnime;
+  }
+
+  /**
+   * Convert Jikan anime data to our format
+   */
+  convertJikanAnime(jikanData) {
+    // Map Jikan status to AniList status
+    const statusMap = {
+      'Currently Airing': 'RELEASING',
+      'Finished Airing': 'FINISHED',
+      'Not yet aired': 'NOT_YET_RELEASED'
+    };
+
+    // Determine season from aired date
+    let season = null;
+    let seasonYear = null;
+    if (jikanData.aired?.from) {
+      const airDate = new Date(jikanData.aired.from);
+      seasonYear = airDate.getFullYear();
+      const month = airDate.getMonth() + 1;
+      if (month >= 1 && month <= 3) season = 'WINTER';
+      else if (month >= 4 && month <= 6) season = 'SPRING';
+      else if (month >= 7 && month <= 9) season = 'SUMMER';
+      else season = 'FALL';
+    }
+    
+    // Use Jikan's season if available
+    if (jikanData.season) {
+      season = jikanData.season.toUpperCase();
+    }
+    if (jikanData.year) {
+      seasonYear = jikanData.year;
+    }
+
+    return {
+      id: jikanData.mal_id,
+      idMal: jikanData.mal_id,
+      isAdult: jikanData.rating?.includes('Rx') || jikanData.genres?.some(g => g.name === 'Hentai') || false,
+      title: {
+        english: jikanData.title_english,
+        romaji: jikanData.title,
+        native: jikanData.title_japanese
+      },
+      season: season,
+      seasonYear: seasonYear,
+      status: statusMap[jikanData.status] || 'RELEASING',
+      episodes: jikanData.episodes,
+      nextAiringEpisode: null, // Jikan doesn't provide this in the same format
+      format: jikanData.type === 'TV' ? 'TV' : jikanData.type,
+      genres: jikanData.genres?.map(g => g.name) || [],
+      averageScore: jikanData.score ? Math.round(jikanData.score * 10) : null,
+      popularity: jikanData.members || 0,
+      coverImage: {
+        large: jikanData.images?.jpg?.large_image_url || jikanData.images?.jpg?.image_url,
+        medium: jikanData.images?.jpg?.image_url,
+        color: null
+      },
+      bannerImage: null,
+      description: jikanData.synopsis,
+      studios: {
+        nodes: jikanData.studios?.map(s => ({ name: s.name })) || []
+      },
+      startDate: jikanData.aired?.from ? {
+        year: new Date(jikanData.aired.from).getFullYear(),
+        month: new Date(jikanData.aired.from).getMonth() + 1,
+        day: new Date(jikanData.aired.from).getDate()
+      } : null,
+      endDate: jikanData.aired?.to ? {
+        year: new Date(jikanData.aired.to).getFullYear(),
+        month: new Date(jikanData.aired.to).getMonth() + 1,
+        day: new Date(jikanData.aired.to).getDate()
+      } : null,
+      source: 'jikan' // Track the source
+    };
+  }
+
+  /**
+   * Fetch anime from Kitsu API
+   */
+  async fetchKitsuSeasonAnime(season, year) {
+    const allAnime = [];
+    let offset = 0;
+    const limit = 20;
+    let hasMore = true;
+
+    // Kitsu uses date ranges for seasons
+    const seasonDates = {
+      'WINTER': { start: `${year}-01-01`, end: `${year}-03-31` },
+      'SPRING': { start: `${year}-04-01`, end: `${year}-06-30` },
+      'SUMMER': { start: `${year}-07-01`, end: `${year}-09-30` },
+      'FALL': { start: `${year}-10-01`, end: `${year}-12-31` }
+    };
+
+    const dates = seasonDates[season];
+    if (!dates) return allAnime;
+
+    while (hasMore && offset < 100) { // Limit total fetched
+      try {
+        const params = new URLSearchParams({
+          'filter[seasonYear]': year,
+          'filter[season]': season.toLowerCase(),
+          'page[limit]': limit,
+          'page[offset]': offset,
+          'sort': '-userCount'
+        });
+
+        const response = await fetch(`${this.KITSU_API}/anime?${params}`, {
+          headers: {
+            'Accept': 'application/vnd.api+json',
+            'Content-Type': 'application/vnd.api+json'
+          }
+        });
+        
+        if (!response.ok) break;
+
+        const data = await response.json();
+        
+        if (data.data && data.data.length > 0) {
+          allAnime.push(...data.data);
+          offset += limit;
+          hasMore = data.data.length === limit;
+        } else {
+          hasMore = false;
+        }
+
+        await this.sleep(500); // Kitsu is more lenient
+      } catch (error) {
+        console.error('Kitsu fetch error:', error);
+        break;
+      }
+    }
+
+    console.log(`📡 Kitsu: Fetched ${allAnime.length} anime for ${season} ${year}`);
+    return allAnime;
+  }
+
+  /**
+   * Convert Kitsu anime data to our format
+   */
+  convertKitsuAnime(kitsuData) {
+    const attrs = kitsuData.attributes;
+    
+    const statusMap = {
+      'current': 'RELEASING',
+      'finished': 'FINISHED',
+      'upcoming': 'NOT_YET_RELEASED',
+      'tba': 'NOT_YET_RELEASED'
+    };
+
+    // Determine season from start date
+    let season = null;
+    let seasonYear = null;
+    if (attrs.startDate) {
+      const startDate = new Date(attrs.startDate);
+      seasonYear = startDate.getFullYear();
+      const month = startDate.getMonth() + 1;
+      if (month >= 1 && month <= 3) season = 'WINTER';
+      else if (month >= 4 && month <= 6) season = 'SPRING';
+      else if (month >= 7 && month <= 9) season = 'SUMMER';
+      else season = 'FALL';
+    }
+
+    return {
+      id: kitsuData.id,
+      kitsuId: kitsuData.id,
+      isAdult: attrs.nsfw || false,
+      title: {
+        english: attrs.titles?.en || attrs.titles?.en_us,
+        romaji: attrs.titles?.en_jp || attrs.canonicalTitle,
+        native: attrs.titles?.ja_jp
+      },
+      season: season,
+      seasonYear: seasonYear,
+      status: statusMap[attrs.status] || 'RELEASING',
+      episodes: attrs.episodeCount,
+      nextAiringEpisode: null,
+      format: attrs.subtype?.toUpperCase() || 'TV',
+      genres: [], // Kitsu requires separate request for genres
+      averageScore: attrs.averageRating ? Math.round(parseFloat(attrs.averageRating)) : null,
+      popularity: attrs.userCount || 0,
+      coverImage: {
+        large: attrs.posterImage?.large || attrs.posterImage?.original,
+        medium: attrs.posterImage?.medium,
+        color: null
+      },
+      bannerImage: attrs.coverImage?.original,
+      description: attrs.synopsis,
+      studios: { nodes: [] }, // Kitsu requires separate request
+      startDate: attrs.startDate ? {
+        year: new Date(attrs.startDate).getFullYear(),
+        month: new Date(attrs.startDate).getMonth() + 1,
+        day: new Date(attrs.startDate).getDate()
+      } : null,
+      endDate: attrs.endDate ? {
+        year: new Date(attrs.endDate).getFullYear(),
+        month: new Date(attrs.endDate).getMonth() + 1,
+        day: new Date(attrs.endDate).getDate()
+      } : null,
+      source: 'kitsu'
+    };
+  }
+
+  /**
+   * Comprehensive season sync - uses ALL APIs
+   */
+  async comprehensiveSeasonSync(season, year) {
+    let added = 0;
+    let updated = 0;
+    const seenIds = new Map(); // Track by MAL ID to avoid duplicates
+    const seenTitles = new Set(); // Fallback for matching
+
+    this.updateProgress(5, 'Starting comprehensive sync from all sources...');
+
+    // 1. Fetch from AniList (primary)
+    this.updateProgress(10, `Fetching from AniList (${season} ${year})...`);
+    const anilistAnime = await this.fetchSeasonAnime(season, year);
+    
+    this.updateProgress(25, `Processing ${anilistAnime.length} AniList anime...`);
+    for (const anime of anilistAnime) {
+      const result = await this.saveAnime(anime);
+      if (result.isNew) added++;
+      else updated++;
+      
+      if (anime.idMal) seenIds.set(anime.idMal, true);
+      if (anime.title?.romaji) seenTitles.add(anime.title.romaji.toLowerCase());
+      if (anime.title?.english) seenTitles.add(anime.title.english.toLowerCase());
+    }
+
+    // 2. Fetch from Jikan/MAL (secondary)
+    this.updateProgress(40, `Fetching from MyAnimeList (${season} ${year})...`);
+    try {
+      const jikanAnime = await this.fetchJikanSeasonAnime(season, year);
+      
+      this.updateProgress(55, `Processing ${jikanAnime.length} MAL anime...`);
+      for (const jikan of jikanAnime) {
+        // Skip if we already have this from AniList
+        if (seenIds.has(jikan.mal_id)) continue;
+        
+        // Check by title as fallback
+        const titleLower = jikan.title?.toLowerCase();
+        const titleEnLower = jikan.title_english?.toLowerCase();
+        if (titleLower && seenTitles.has(titleLower)) continue;
+        if (titleEnLower && seenTitles.has(titleEnLower)) continue;
+
+        // New anime from Jikan!
+        const converted = this.convertJikanAnime(jikan);
+        const result = await this.saveAnimeFromJikan(converted);
+        if (result.isNew) added++;
+        else updated++;
+        
+        seenIds.set(jikan.mal_id, true);
+        if (titleLower) seenTitles.add(titleLower);
+        if (titleEnLower) seenTitles.add(titleEnLower);
+      }
+    } catch (error) {
+      console.warn('Jikan sync failed, continuing...', error);
+    }
+
+    // 3. Fetch from Kitsu (tertiary)
+    this.updateProgress(70, `Fetching from Kitsu (${season} ${year})...`);
+    try {
+      const kitsuAnime = await this.fetchKitsuSeasonAnime(season, year);
+      
+      this.updateProgress(85, `Processing ${kitsuAnime.length} Kitsu anime...`);
+      for (const kitsu of kitsuAnime) {
+        const converted = this.convertKitsuAnime(kitsu);
+        
+        // Check if we already have this
+        const titleLower = converted.title?.romaji?.toLowerCase();
+        const titleEnLower = converted.title?.english?.toLowerCase();
+        if (titleLower && seenTitles.has(titleLower)) continue;
+        if (titleEnLower && seenTitles.has(titleEnLower)) continue;
+
+        // New anime from Kitsu!
+        const result = await this.saveAnimeFromKitsu(converted);
+        if (result.isNew) added++;
+        else updated++;
+        
+        if (titleLower) seenTitles.add(titleLower);
+        if (titleEnLower) seenTitles.add(titleEnLower);
+      }
+    } catch (error) {
+      console.warn('Kitsu sync failed, continuing...', error);
+    }
+
+    // 4. Also fetch currently airing from Jikan (catches shows that might be missing)
+    this.updateProgress(90, 'Checking for additional airing anime...');
+    try {
+      const jikanAiring = await this.fetchJikanAiringAnime();
+      for (const jikan of jikanAiring) {
+        if (seenIds.has(jikan.mal_id)) continue;
+        
+        const converted = this.convertJikanAnime(jikan);
+        // Only save if it matches current season
+        if (converted.season === season && converted.seasonYear === year) {
+          const result = await this.saveAnimeFromJikan(converted);
+          if (result.isNew) added++;
+        }
+      }
+    } catch (error) {
+      console.warn('Jikan airing sync failed', error);
+    }
+
+    this.updateProgress(100, 'Comprehensive sync complete!');
+    console.log(`✅ Comprehensive sync: ${added} added, ${updated} updated from all sources`);
+    return { added, updated, sources: ['AniList', 'MyAnimeList', 'Kitsu'] };
+  }
+
+  /**
+   * Save anime from Jikan format
+   */
+  async saveAnimeFromJikan(jikanData) {
+    const animeId = `mal_${jikanData.idMal}`;
+    
+    const existingSnapshot = await refs.anime.child(animeId).once('value');
+    const existing = existingSnapshot.val() || {};
+    
+    const animeData = {
+      malId: jikanData.idMal,
+      title: jikanData.title.english || jikanData.title.romaji,
+      titleRomaji: jikanData.title.romaji,
+      titleEnglish: jikanData.title.english,
+      titleNative: jikanData.title.native,
+      season: jikanData.season,
+      year: jikanData.seasonYear,
+      status: jikanData.status,
+      episodes: jikanData.episodes || null,
+      format: jikanData.format || null,
+      genres: jikanData.genres || [],
+      score: jikanData.averageScore || null,
+      popularity: jikanData.popularity || 0,
+      coverImage: jikanData.coverImage?.large || jikanData.coverImage?.medium || null,
+      description: jikanData.description || null,
+      studios: jikanData.studios?.nodes?.map(s => s.name) || [],
+      startDate: this.formatDate(jikanData.startDate),
+      endDate: this.formatDate(jikanData.endDate),
+      isAdult: jikanData.isAdult || false,
+      source: 'jikan',
+      updatedAt: Date.now(),
+      
+      // Preserve existing dub data
+      hasDub: existing.hasDub ?? null,
+      dubConfidence: existing.dubConfidence ?? null,
+      dubPlatforms: existing.dubPlatforms ?? null
+    };
+
+    Object.keys(animeData).forEach(key => {
+      if (animeData[key] === undefined) animeData[key] = null;
+    });
+
+    const isNew = !existingSnapshot.exists();
+    if (isNew) animeData.createdAt = Date.now();
+
+    await refs.anime.child(animeId).update(animeData);
+    return { isNew, id: animeId };
+  }
+
+  /**
+   * Save anime from Kitsu format
+   */
+  async saveAnimeFromKitsu(kitsuData) {
+    const animeId = `kitsu_${kitsuData.kitsuId}`;
+    
+    const existingSnapshot = await refs.anime.child(animeId).once('value');
+    const existing = existingSnapshot.val() || {};
+    
+    const animeData = {
+      kitsuId: kitsuData.kitsuId,
+      title: kitsuData.title.english || kitsuData.title.romaji,
+      titleRomaji: kitsuData.title.romaji,
+      titleEnglish: kitsuData.title.english,
+      titleNative: kitsuData.title.native,
+      season: kitsuData.season,
+      year: kitsuData.seasonYear,
+      status: kitsuData.status,
+      episodes: kitsuData.episodes || null,
+      format: kitsuData.format || null,
+      genres: kitsuData.genres || [],
+      score: kitsuData.averageScore || null,
+      popularity: kitsuData.popularity || 0,
+      coverImage: kitsuData.coverImage?.large || kitsuData.coverImage?.medium || null,
+      bannerImage: kitsuData.bannerImage || null,
+      description: kitsuData.description || null,
+      startDate: this.formatDate(kitsuData.startDate),
+      endDate: this.formatDate(kitsuData.endDate),
+      isAdult: kitsuData.isAdult || false,
+      source: 'kitsu',
+      updatedAt: Date.now(),
+      
+      // Preserve existing dub data
+      hasDub: existing.hasDub ?? null,
+      dubConfidence: existing.dubConfidence ?? null,
+      dubPlatforms: existing.dubPlatforms ?? null
+    };
+
+    Object.keys(animeData).forEach(key => {
+      if (animeData[key] === undefined) animeData[key] = null;
+    });
+
+    const isNew = !existingSnapshot.exists();
+    if (isNew) animeData.createdAt = Date.now();
+
+    await refs.anime.child(animeId).update(animeData);
+    return { isNew, id: animeId };
   }
 
   updateProgress(percent, message) {

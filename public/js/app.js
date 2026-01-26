@@ -264,6 +264,17 @@ const localCache = {
     }
   },
 
+  // Clear cache for a specific season
+  clear(season, year) {
+    try {
+      const key = this.getKey(season, year);
+      localStorage.removeItem(key);
+      console.log(`🗑️ Cleared cache for ${season} ${year}`);
+    } catch (e) {
+      console.warn('Local storage clear error:', e);
+    }
+  },
+
   // Remove oldest cache entries (but prefer keeping finished seasons)
   clearOldest(count = 2) {
     const entries = this.getAllEntries();
@@ -414,6 +425,47 @@ function setupEventListeners() {
     }
     updateSeasonDisplay();
     await loadAnimeWithSync();
+  });
+
+  // Sync button - comprehensive sync from all APIs
+  document.getElementById('syncBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('syncBtn');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Syncing...';
+    btn.classList.add('syncing');
+    
+    try {
+      showSyncBanner(true);
+      
+      // Run comprehensive sync from all sources
+      await animeSync.comprehensiveSeasonSync(currentSeason, currentYear);
+      
+      // Clear local cache for this season to force reload
+      localCache.clear(currentSeason, currentYear);
+      
+      // Reload anime
+      await loadAnime();
+      
+      hideSyncBanner();
+      btn.innerHTML = '✅ Done!';
+      
+      setTimeout(() => {
+        btn.innerHTML = '🔄 Sync';
+        btn.disabled = false;
+        btn.classList.remove('syncing');
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Sync error:', error);
+      btn.innerHTML = '❌ Error';
+      hideSyncBanner();
+      
+      setTimeout(() => {
+        btn.innerHTML = '🔄 Sync';
+        btn.disabled = false;
+        btn.classList.remove('syncing');
+      }, 2000);
+    }
   });
 
   // Filters

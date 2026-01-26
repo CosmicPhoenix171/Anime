@@ -427,7 +427,7 @@ function setupEventListeners() {
     await loadAnimeWithSync();
   });
 
-  // Sync button - comprehensive sync from all APIs
+  // Sync button - comprehensive sync from all APIs (V2 - hierarchical system)
   document.getElementById('syncBtn')?.addEventListener('click', async () => {
     const btn = document.getElementById('syncBtn');
     btn.disabled = true;
@@ -437,8 +437,8 @@ function setupEventListeners() {
     try {
       showSyncBanner(true);
       
-      // Run comprehensive sync from all sources
-      await animeSync.comprehensiveSeasonSync(currentSeason, currentYear);
+      // Run comprehensive sync from all 4 sources with hierarchical enrichment
+      await animeSync.comprehensiveSeasonSyncV2(currentSeason, currentYear);
       
       // Clear local cache for this season to force reload
       localCache.clear(currentSeason, currentYear);

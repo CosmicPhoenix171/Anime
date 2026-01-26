@@ -83,12 +83,14 @@ class DubChecker {
 
     try {
       // Run all checks in parallel where possible
+      const kitsuId = anime.kitsuId;
       const checks = await Promise.allSettled([
         this.checkAniListDub(animeId),
         malId ? this.checkJikanDub(malId) : Promise.resolve(null),
         this.checkFirebaseOverride(animeId),
         this.checkKnownDubList(animeId, title),
-        this.checkTMDBDub(title, anime.year || anime.seasonYear)
+        this.checkTMDBDub(title, anime.year || anime.seasonYear),
+        this.checkKitsuDub(kitsuId, title)
       ]);
 
       // Process AniList results
@@ -151,6 +153,17 @@ class DubChecker {
         if (tmdbResult.tmdbId) {
           results.tmdbId = tmdbResult.tmdbId;
           results.tmdbType = tmdbResult.tmdbType;
+        }
+      }
+
+      // Process Kitsu results
+      if (checks[5].status === 'fulfilled' && checks[5].value) {
+        const kitsuResult = checks[5].value;
+        if (kitsuResult.hasDub) {
+          results.hasDub = true;
+          results.confidence += kitsuResult.confidence || 25;
+          results.sources.push('Kitsu');
+          results.platforms.push(...(kitsuResult.platforms || []));
         }
       }
 
@@ -429,7 +442,23 @@ class DubChecker {
         { pattern: /fairy tail/i, platforms: ['Crunchyroll', 'Funimation'] },
         { pattern: /overlord/i, platforms: ['Crunchyroll', 'Funimation'] },
         { pattern: /that time i got reincarnated as a slime|tensei shitara slime/i, platforms: ['Crunchyroll'] },
-        { pattern: /mushoku tensei/i, platforms: ['Crunchyroll', 'Funimation'] }
+        { pattern: /mushoku tensei/i, platforms: ['Crunchyroll', 'Funimation'] },
+        { pattern: /frieren/i, platforms: ['Crunchyroll'] },
+        { pattern: /solo leveling/i, platforms: ['Crunchyroll'] },
+        { pattern: /oshi no ko/i, platforms: ['Hidive'] },
+        { pattern: /vinland saga/i, platforms: ['Crunchyroll', 'Netflix'] },
+        { pattern: /made in abyss/i, platforms: ['Hidive'] },
+        { pattern: /dandadan/i, platforms: ['Crunchyroll', 'Netflix'] },
+        { pattern: /blue lock/i, platforms: ['Crunchyroll'] },
+        { pattern: /bocchi the rock/i, platforms: ['Crunchyroll'] },
+        { pattern: /the apothecary diaries|kusuriya no hitorigoto/i, platforms: ['Crunchyroll'] },
+        { pattern: /kaiju no\.?\s*8/i, platforms: ['Crunchyroll'] },
+        { pattern: /wind breaker/i, platforms: ['Crunchyroll'] },
+        { pattern: /delicious in dungeon|dungeon meshi/i, platforms: ['Netflix'] },
+        { pattern: /hell.?s paradise|jigokuraku/i, platforms: ['Crunchyroll'] },
+        { pattern: /zom\s*100/i, platforms: ['Crunchyroll'] },
+        { pattern: /undead unluck/i, platforms: ['Hulu'] },
+        { pattern: /eminence in shadow/i, platforms: ['Hidive'] }
       ];
 
       for (const { pattern, platforms } of dubPatterns) {
@@ -463,6 +492,86 @@ class DubChecker {
 
     } catch (error) {
       console.error('TMDB dub check error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check Kitsu API for dub information
+   */
+  async checkKitsuDub(kitsuId, title) {
+    try {
+      let id = kitsuId;
+      
+      // If no Kitsu ID, search by title
+      if (!id && title) {
+        const searchResponse = await fetch(
+          `https://kitsu.io/api/edge/anime?filter[text]=${encodeURIComponent(title)}&page[limit]=1`,
+          {
+            headers: {
+              'Accept': 'application/vnd.api+json',
+              'Content-Type': 'application/vnd.api+json'
+            }
+          }
+        );
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          if (searchData.data?.[0]) {
+            id = searchData.data[0].id;
+          }
+        }
+      }
+
+      if (!id) return null;
+
+      // Get anime details with streaming links
+      const response = await fetch(
+        `https://kitsu.io/api/edge/anime/${id}?include=streamingLinks,streamingLinks.streamer`,
+        {
+          headers: {
+            'Accept': 'application/vnd.api+json',
+            'Content-Type': 'application/vnd.api+json'
+          }
+        }
+      );
+
+      if (!response.ok) return null;
+      const data = await response.json();
+
+      const result = { hasDub: false, platforms: [], confidence: 0 };
+
+      // Check streaming links for dub indicators
+      if (data.included) {
+        for (const item of data.included) {
+          if (item.type === 'streamingLinks') {
+            const url = item.attributes?.url || '';
+            const subs = item.attributes?.subs || [];
+            const dubs = item.attributes?.dubs || [];
+            
+            // Check if English is in dubs array
+            if (dubs.includes('en') || dubs.includes('english')) {
+              result.hasDub = true;
+              result.confidence = 90;
+            }
+            
+            // Check URL for dub indicators
+            if (url.toLowerCase().includes('dub') || url.toLowerCase().includes('english')) {
+              result.hasDub = true;
+              result.confidence = Math.max(result.confidence, 70);
+            }
+          } else if (item.type === 'streamers') {
+            const name = item.attributes?.siteName;
+            if (name && this.DUB_PLATFORMS[name]) {
+              result.platforms.push(name);
+            }
+          }
+        }
+      }
+
+      return result;
+
+    } catch (error) {
+      console.error('Kitsu dub check error:', error);
       return null;
     }
   }

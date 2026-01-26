@@ -987,7 +987,7 @@ class AnimeSync {
       this.updateProgress(75, `Phase 3 complete: ${enrichedAnime.length} anime enriched`);
 
       // ========== PHASE 4: Save to Firebase ==========
-      this.updateProgress(80, 'Phase 4: Saving to Firebase...');
+      this.updateProgress(78, 'Phase 4: Saving to Firebase...');
 
       for (let i = 0; i < enrichedAnime.length; i++) {
         const anime = enrichedAnime[i];
@@ -997,9 +997,55 @@ class AnimeSync {
         else updated++;
 
         if (i % 20 === 0) {
-          const progress = 80 + (i / enrichedAnime.length) * 18;
+          const progress = 78 + (i / enrichedAnime.length) * 10;
           this.updateProgress(progress, `Saving ${i + 1}/${enrichedAnime.length} anime...`);
         }
+      }
+
+      // ========== PHASE 5: Dub Checking ==========
+      this.updateProgress(88, 'Phase 5: Checking dubs from all sources...');
+      let dubbedCount = 0;
+
+      if (typeof dubChecker !== 'undefined') {
+        for (let i = 0; i < enrichedAnime.length; i++) {
+          const anime = enrichedAnime[i];
+          const animeId = anime.anilistId ? `al_${anime.anilistId}` : 
+                          anime.malId ? `mal_${anime.malId}` : 
+                          anime.kitsuId ? `kitsu_${anime.kitsuId}` : null;
+          
+          if (animeId) {
+            try {
+              const dubResult = await dubChecker.checkDub({
+                id: animeId,
+                anilistId: anime.anilistId,
+                malId: anime.malId,
+                kitsuId: anime.kitsuId,
+                title: anime.title || anime.titleEnglish || anime.titleRomaji,
+                titleRomaji: anime.titleRomaji,
+                year: anime.year
+              });
+              
+              if (dubResult?.hasDub) {
+                dubbedCount++;
+              }
+            } catch (e) {
+              console.warn(`Dub check failed for ${anime.title}:`, e.message);
+            }
+          }
+
+          if (i % 10 === 0) {
+            const progress = 88 + (i / enrichedAnime.length) * 10;
+            this.updateProgress(progress, `Checking dubs ${i + 1}/${enrichedAnime.length}...`);
+          }
+
+          // Small delay to avoid rate limiting
+          if (i % 5 === 0) {
+            await this.sleep(200);
+          }
+        }
+        console.log(`🎙️ Dub check complete: ${dubbedCount}/${enrichedAnime.length} have dubs`);
+      } else {
+        console.log('⚠️ DubChecker not available, skipping dub checks');
       }
 
       // Log results
@@ -1009,6 +1055,7 @@ class AnimeSync {
         year,
         added,
         updated,
+        dubbed: dubbedCount,
         total: enrichedAnime.length,
         sources: {
           anilist: anilistResults.length,
@@ -1023,7 +1070,7 @@ class AnimeSync {
 
       await refs.syncLog.child(`comprehensive/${season}_${year}`).set(syncResult);
 
-      this.updateProgress(100, `Complete! ${added} added, ${updated} updated from 4 APIs`);
+      this.updateProgress(100, `Complete! ${added} added, ${updated} updated, ${dubbedCount} dubbed`);
       console.log('✅ Comprehensive sync complete:', syncResult);
 
       return syncResult;

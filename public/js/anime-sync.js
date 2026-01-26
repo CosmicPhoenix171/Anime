@@ -314,6 +314,7 @@ class AnimeSync {
             media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC) {
               id
               idMal
+              isAdult
               title {
                 romaji
                 english
@@ -492,6 +493,7 @@ class AnimeSync {
       studios: anilistData.studios?.nodes?.map(s => s.name) || [],
       startDate: this.formatDate(anilistData.startDate),
       endDate: this.formatDate(anilistData.endDate),
+      isAdult: anilistData.isAdult || false,
       updatedAt: Date.now(),
       
       // Preserve existing dub data (don't overwrite user-contributed info)

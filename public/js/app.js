@@ -421,6 +421,7 @@ function setupEventListeners() {
   document.getElementById('formatFilter')?.addEventListener('change', filterAnime);
   document.getElementById('dubFilter')?.addEventListener('change', filterAnime);
   document.getElementById('sortFilter')?.addEventListener('change', filterAnime);
+  document.getElementById('adultFilter')?.addEventListener('change', filterAnime);
 
   // Search with debounce
   document.getElementById('searchInput')?.addEventListener('input', () => {
@@ -612,8 +613,14 @@ function filterAnime() {
   const dubFilter = document.getElementById('dubFilter')?.value;
   const sortFilter = document.getElementById('sortFilter')?.value;
   const searchQuery = document.getElementById('searchInput')?.value.toLowerCase();
+  const showAdult = document.getElementById('adultFilter')?.checked || false;
 
   let filtered = [...animeCache];
+
+  // Filter out adult content (hentai) by default unless checkbox is checked
+  if (!showAdult) {
+    filtered = filtered.filter(a => !a.isAdult);
+  }
 
   // Apply filters
   if (statusFilter) {

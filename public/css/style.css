@@ -1030,6 +1030,48 @@ footer p {
   min-width: 200px;
 }
 
+/* Adult Content Toggle */
+.toggle-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid #e8e8e8;
+  border-radius: 8px;
+  background: #f8f8f8;
+  transition: all 0.2s;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.toggle-filter:hover {
+  border-color: #667eea;
+  background: #fff;
+}
+
+.toggle-filter input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #e74c3c;
+  cursor: pointer;
+}
+
+.toggle-filter .toggle-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #666;
+}
+
+.toggle-filter:has(input:checked) {
+  border-color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+}
+
+.toggle-filter:has(input:checked) .toggle-label {
+  color: #e74c3c;
+}
+
 /* Enhanced Anime Cards */
 .anime-card {
   text-decoration: none;
@@ -2055,6 +2097,11 @@ footer p {
   .filter-bar select,
   .filter-bar input {
     width: 100%;
+  }
+
+  .toggle-filter {
+    width: 100%;
+    justify-content: center;
   }
 }
 

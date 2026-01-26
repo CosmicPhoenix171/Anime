@@ -4,6 +4,7 @@
  */
 
 const ANILIST_API = 'https://graphql.anilist.co';
+const JIKAN_API = 'https://api.jikan.moe/v4';
 let currentAnime = null;
 let currentUser = null;
 
@@ -198,14 +199,55 @@ async function fetchAniListDetails(anilistId, returnData = false) {
 }
 
 /**
+ * Fetch English title from Jikan/MAL if missing
+ */
+async function fetchEnglishTitleFromJikan(malId, romaji) {
+  try {
+    if (malId) {
+      const response = await fetch(`${JIKAN_API}/anime/${malId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data?.title_english) {
+          return data.data.title_english;
+        }
+      }
+    }
+    
+    // If no MAL ID, try searching by title
+    if (romaji) {
+      const response = await fetch(`${JIKAN_API}/anime?q=${encodeURIComponent(romaji)}&limit=1`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data?.[0]?.title_english) {
+          return data.data[0].title_english;
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Jikan English title fetch error:', error);
+    return null;
+  }
+}
+
+/**
  * Display anime details on page
  */
-function displayAnimeDetails(anime) {
+async function displayAnimeDetails(anime) {
   currentAnime = anime;
   
   // Hide loading, show content
   document.getElementById('loadingState').style.display = 'none';
   document.getElementById('animeContent').style.display = 'block';
+
+  // If no English title, try to fetch from Jikan
+  if (!anime.titleEnglish && (anime.malId || anime.titleRomaji)) {
+    const englishTitle = await fetchEnglishTitleFromJikan(anime.malId, anime.titleRomaji);
+    if (englishTitle) {
+      anime.titleEnglish = englishTitle;
+    }
+  }
 
   // Set page title
   document.title = `${anime.titleEnglish || anime.title} - Anime Tracker`;
@@ -226,7 +268,11 @@ function displayAnimeDetails(anime) {
 
   // Titles
   document.getElementById('animeTitle').textContent = anime.titleEnglish || anime.title || anime.titleRomaji;
-  document.getElementById('animeTitleNative').textContent = anime.titleNative || anime.titleRomaji || '';
+  // Show romaji subtitle if different from main title, hide native Japanese title
+  const mainTitle = anime.titleEnglish || anime.title || anime.titleRomaji;
+  const romajiTitle = anime.titleRomaji || '';
+  document.getElementById('animeTitleNative').textContent = 
+    (romajiTitle && romajiTitle !== mainTitle) ? romajiTitle : '';
 
   // Quick info tags
   document.getElementById('animeFormat').textContent = formatType(anime.format);

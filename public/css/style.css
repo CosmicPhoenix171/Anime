@@ -461,6 +461,36 @@ body {
   display: inline-block;
 }
 
+/* Episode Progress Bar */
+.card-episode-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.episode-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.episode-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.episode-progress-text {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #666;
+  white-space: nowrap;
+}
+
 .card-studio {
   font-size: 0.7rem;
   color: #999;

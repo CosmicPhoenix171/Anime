@@ -772,6 +772,9 @@ function createAnimeCard(anime) {
   // Rating badge
   const ratingBadge = getRatingBadge(anime.rating);
 
+  // Episode progress bar for airing shows with known total episodes
+  const progressBar = getEpisodeProgressBar(anime);
+
   return `
     <a href="./anime.html?id=${anime.id}" class="anime-card">
       <div class="card-image">
@@ -788,6 +791,7 @@ function createAnimeCard(anime) {
           <span class="card-format">${anime.format || 'TV'}</span>
           <span class="card-eps">${episodes}</span>
         </div>
+        ${progressBar}
         ${nextEp ? `<div class="card-next-ep">${nextEp}</div>` : ''}
         ${anime.studios?.length ? `<div class="card-studio">${anime.studios[0]}</div>` : ''}
       </div>
@@ -881,6 +885,32 @@ function getNextEpisodeText(anime) {
   } else {
     return `Ep ${anime.nextEpisode} soon!`;
   }
+}
+
+/**
+ * Get episode progress bar for airing shows
+ */
+function getEpisodeProgressBar(anime) {
+  // Only show for airing shows with known total episodes and next episode info
+  if (anime.status !== 'RELEASING' || !anime.episodes || !anime.nextEpisode) return '';
+  
+  // Current aired episodes is nextEpisode - 1
+  const airedEpisodes = anime.nextEpisode - 1;
+  const totalEpisodes = anime.episodes;
+  
+  // Don't show if no episodes have aired yet
+  if (airedEpisodes <= 0) return '';
+  
+  const progressPercent = Math.round((airedEpisodes / totalEpisodes) * 100);
+  
+  return `
+    <div class="card-episode-progress" title="${airedEpisodes} of ${totalEpisodes} episodes aired">
+      <div class="episode-progress-bar">
+        <div class="episode-progress-fill" style="width: ${progressPercent}%"></div>
+      </div>
+      <span class="episode-progress-text">${airedEpisodes}/${totalEpisodes}</span>
+    </div>
+  `;
 }
 
 /**

@@ -367,18 +367,42 @@ class AnimeSync {
   // ============================================================
 
   /**
-   * Normalize a title for matching
+   * Normalize a title for matching - aggressive normalization
    */
   normalizeTitle(title) {
     if (!title) return '';
     return title
       .toLowerCase()
+      // Remove all punctuation and special characters
+      .replace(/[-:;,.'"""''!?~@#$%^&*()+=\[\]{}|\\/<>]/g, ' ')
       .replace(/[^\w\s]/g, '')
       .replace(/\s+/g, ' ')
+      // Remove common articles
       .replace(/\b(the|a|an)\b/g, '')
+      // Remove season indicators
       .replace(/\s*(season|part|cour)\s*\d+/gi, '')
       .replace(/\s*(2nd|3rd|\d+th)\s*season/gi, '')
+      .replace(/\s*final\s*season/gi, '')
+      .replace(/\s*s\d+$/gi, '') // Remove S1, S2, etc at end
+      // Remove subtitle indicators
+      .replace(/\s*-+\s*/g, ' ')
       .trim();
+  }
+
+  /**
+   * Extract base title (removes subtitles and season info)
+   */
+  extractBaseTitle(title) {
+    if (!title) return '';
+    // Split on common subtitle separators
+    const separators = [' - ', ': ', ' ~ ', ' – '];
+    let base = title;
+    for (const sep of separators) {
+      if (base.includes(sep)) {
+        base = base.split(sep)[0];
+      }
+    }
+    return this.normalizeTitle(base);
   }
 
   /**
@@ -421,11 +445,69 @@ class AnimeSync {
   }
 
   /**
+   * Find existing entry by fuzzy title matching
+   */
+  findExistingByTitle(title, titleIndex, unified) {
+    if (!title) return null;
+
+    const normalizedTitle = this.normalizeTitle(title);
+    const baseTitle = this.extractBaseTitle(title);
+
+    // Exact match on normalized title
+    if (titleIndex.has(normalizedTitle)) {
+      return titleIndex.get(normalizedTitle);
+    }
+
+    // Exact match on base title
+    if (titleIndex.has(baseTitle)) {
+      return titleIndex.get(baseTitle);
+    }
+
+    // Fuzzy match against all indexed titles
+    for (const [indexedTitle, canonicalId] of titleIndex) {
+      // Check fuzzy match on full normalized titles
+      if (this.fuzzyMatch(normalizedTitle, indexedTitle, 0.85)) {
+        return canonicalId;
+      }
+      // Check if base titles match
+      if (baseTitle.length >= 5 && indexedTitle.includes(baseTitle)) {
+        return canonicalId;
+      }
+      if (baseTitle.length >= 5 && baseTitle.includes(indexedTitle) && indexedTitle.length >= 5) {
+        return canonicalId;
+      }
+    }
+
+    // Check against existing entries' all titles
+    for (const [id, entry] of unified) {
+      const entryTitles = [
+        entry.title, entry.titleRomaji, entry.titleEnglish,
+        ...(entry.synonyms || [])
+      ].filter(Boolean);
+
+      for (const entryTitle of entryTitles) {
+        const normalizedEntry = this.normalizeTitle(entryTitle);
+        const baseEntry = this.extractBaseTitle(entryTitle);
+
+        if (this.fuzzyMatch(normalizedTitle, normalizedEntry, 0.85)) {
+          return id;
+        }
+        if (this.fuzzyMatch(baseTitle, baseEntry, 0.90)) {
+          return id;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Create unified list from all API sources with deduplication
    */
   createUnifiedList(results) {
     const unified = new Map();
     const titleIndex = new Map();
+    const baseIndex = new Map(); // Index by base titles too
 
     // Helper to generate canonical ID
     const getCanonicalId = (malId, anilistId, kitsuId, title) => {
@@ -433,6 +515,22 @@ class AnimeSync {
       if (malId) return `mal_${malId}`;
       if (kitsuId) return `kitsu_${kitsuId}`;
       return `title_${this.normalizeTitle(title).replace(/\s/g, '_')}`;
+    };
+
+    // Helper to index all title variants
+    const indexTitles = (anime, canonicalId) => {
+      const titles = [
+        anime.title, anime.titleRomaji, anime.titleEnglish,
+        ...(anime.synonyms || [])
+      ].filter(Boolean);
+
+      for (const t of titles) {
+        titleIndex.set(this.normalizeTitle(t), canonicalId);
+        const base = this.extractBaseTitle(t);
+        if (base.length >= 5) {
+          baseIndex.set(base, canonicalId);
+        }
+      }
     };
 
     // Process AniList first (highest priority)
@@ -447,10 +545,7 @@ class AnimeSync {
         _sources: { anilist: anime }
       });
 
-      // Index titles
-      [normalized.title, normalized.titleRomaji, normalized.titleEnglish, ...(normalized.synonyms || [])]
-        .filter(Boolean)
-        .forEach(t => titleIndex.set(this.normalizeTitle(t), canonicalId));
+      indexTitles(normalized, canonicalId);
     }
 
     // Process Jikan results
@@ -458,26 +553,32 @@ class AnimeSync {
     for (const anime of results.jikan || []) {
       const normalized = this.normalizeJikanData(anime);
 
-      // Check if already exists
+      // Check if already exists by MAL ID first
       let existingId = null;
-      if (normalized.malId && unified.has(`mal_${normalized.malId}`)) {
-        existingId = `mal_${normalized.malId}`;
-      } else {
-        // Check by AniList ID match
-        for (const [id, entry] of unified) {
-          if (entry.malId === normalized.malId) {
-            existingId = id;
-            break;
+      if (normalized.malId) {
+        // Direct mal ID lookup
+        if (unified.has(`mal_${normalized.malId}`)) {
+          existingId = `mal_${normalized.malId}`;
+        } else {
+          // Check if any entry has this MAL ID
+          for (const [id, entry] of unified) {
+            if (entry.malId === normalized.malId) {
+              existingId = id;
+              break;
+            }
           }
         }
       }
 
+      // If not found by ID, use fuzzy title matching
       if (!existingId) {
-        // Check by title
-        const titleKey = this.normalizeTitle(normalized.title);
-        if (titleIndex.has(titleKey)) {
-          existingId = titleIndex.get(titleKey);
-        }
+        existingId = this.findExistingByTitle(normalized.title, titleIndex, unified);
+      }
+      if (!existingId && normalized.titleEnglish) {
+        existingId = this.findExistingByTitle(normalized.titleEnglish, titleIndex, unified);
+      }
+      if (!existingId && normalized.titleRomaji) {
+        existingId = this.findExistingByTitle(normalized.titleRomaji, titleIndex, unified);
       }
 
       if (existingId) {
@@ -491,6 +592,8 @@ class AnimeSync {
         if (normalized.altTitles?.length) {
           existing.altTitles = [...(existing.altTitles || []), ...normalized.altTitles];
         }
+        // Update index with new titles
+        indexTitles(normalized, existingId);
       } else {
         const canonicalId = getCanonicalId(normalized.malId, null, null, normalized.title);
         unified.set(canonicalId, {
@@ -498,10 +601,7 @@ class AnimeSync {
           ...normalized,
           _sources: { jikan: anime }
         });
-
-        [normalized.title, normalized.titleRomaji, normalized.titleEnglish]
-          .filter(Boolean)
-          .forEach(t => titleIndex.set(this.normalizeTitle(t), canonicalId));
+        indexTitles(normalized, canonicalId);
       }
     }
 
@@ -512,17 +612,32 @@ class AnimeSync {
       const mappings = anime._mappings || {};
 
       let existingId = null;
-      if (mappings.malId && unified.has(`mal_${mappings.malId}`)) {
-        existingId = `mal_${mappings.malId}`;
-      } else if (mappings.anilistId && unified.has(`al_${mappings.anilistId}`)) {
-        existingId = `al_${mappings.anilistId}`;
+      
+      // Check by mapped IDs first
+      if (mappings.malId) {
+        if (unified.has(`mal_${mappings.malId}`)) {
+          existingId = `mal_${mappings.malId}`;
+        } else {
+          for (const [id, entry] of unified) {
+            if (entry.malId === mappings.malId) {
+              existingId = id;
+              break;
+            }
+          }
+        }
+      }
+      if (!existingId && mappings.anilistId) {
+        if (unified.has(`al_${mappings.anilistId}`)) {
+          existingId = `al_${mappings.anilistId}`;
+        }
       }
 
+      // Fuzzy title matching if no ID match
       if (!existingId) {
-        const titleKey = this.normalizeTitle(normalized.title);
-        if (titleIndex.has(titleKey)) {
-          existingId = titleIndex.get(titleKey);
-        }
+        existingId = this.findExistingByTitle(normalized.title, titleIndex, unified);
+      }
+      if (!existingId && normalized.titleEnglish) {
+        existingId = this.findExistingByTitle(normalized.titleEnglish, titleIndex, unified);
       }
 
       if (existingId) {
@@ -531,6 +646,7 @@ class AnimeSync {
         existing.kitsuId = normalized.kitsuId;
         if (mappings.malId && !existing.malId) existing.malId = mappings.malId;
         if (mappings.anilistId && !existing.anilistId) existing.anilistId = mappings.anilistId;
+        indexTitles(normalized, existingId);
       } else {
         const canonicalId = getCanonicalId(mappings.malId, mappings.anilistId, normalized.kitsuId, normalized.title);
         unified.set(canonicalId, {
@@ -538,10 +654,7 @@ class AnimeSync {
           ...normalized,
           _sources: { kitsu: anime }
         });
-
-        [normalized.title, normalized.titleRomaji, normalized.titleEnglish]
-          .filter(Boolean)
-          .forEach(t => titleIndex.set(this.normalizeTitle(t), canonicalId));
+        indexTitles(normalized, canonicalId);
       }
     }
 
@@ -549,10 +662,14 @@ class AnimeSync {
     console.log('📊 Processing TMDB results...');
     for (const anime of results.tmdb || []) {
       const normalized = this.normalizeTMDBData(anime);
-      const titleKey = this.normalizeTitle(normalized.title);
+      
+      // Use fuzzy matching for TMDB too
+      let existingId = this.findExistingByTitle(normalized.title, titleIndex, unified);
+      if (!existingId && normalized.titleOriginal) {
+        existingId = this.findExistingByTitle(normalized.titleOriginal, titleIndex, unified);
+      }
 
-      if (titleIndex.has(titleKey)) {
-        const existingId = titleIndex.get(titleKey);
+      if (existingId) {
         const existing = unified.get(existingId);
         existing._sources.tmdb = anime;
         existing.tmdbId = normalized.tmdbId;

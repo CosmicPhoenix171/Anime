@@ -671,7 +671,20 @@ function filterAnime() {
 
   // Filter out adult content (hentai) by default unless checkbox is checked
   if (!showAdult) {
-    filtered = filtered.filter(a => !a.isAdult);
+    filtered = filtered.filter(a => {
+      // Explicit isAdult flag
+      if (a.isAdult === true) return false;
+      // Also check genres for Hentai/Erotica (backup check)
+      if (a.genres?.some(g => 
+        g.toLowerCase() === 'hentai' || 
+        g.toLowerCase() === 'erotica'
+      )) return false;
+      // Check themes
+      if (a.themes?.some(t => 
+        t.toLowerCase() === 'hentai'
+      )) return false;
+      return true;
+    });
   }
 
   // Apply filters

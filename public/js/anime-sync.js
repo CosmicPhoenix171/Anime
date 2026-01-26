@@ -54,7 +54,8 @@ class AnimeSync {
       licensors: ['jikan'],
       producers: ['jikan'],
       themes: ['jikan'],
-      demographics: ['jikan']
+      demographics: ['jikan'],
+      isAdult: ['anilist', 'jikan', 'kitsu']
     };
   }
 
@@ -778,7 +779,15 @@ class AnimeSync {
       startDate: jikan.aired?.from ? this.formatDateFromString(jikan.aired.from) : null,
       endDate: jikan.aired?.to ? this.formatDateFromString(jikan.aired.to) : null,
       broadcast: jikan.broadcast?.string || null,
-      isAdult: jikan.rating?.includes('Rx') || jikan.genres?.some(g => g.name === 'Hentai'),
+      // Comprehensive adult content detection for Jikan
+      isAdult: (
+        jikan.rating?.includes('Rx') || // Rx - Hentai rating
+        jikan.rating?.includes('R+') || // R+ - Mild Nudity
+        jikan.genres?.some(g => g.name === 'Hentai') ||
+        jikan.genres?.some(g => g.name === 'Erotica') ||
+        jikan.themes?.some(t => t.name === 'Hentai') ||
+        jikan.demographics?.some(d => d.name === 'Hentai')
+      ) || false,
       rating: jikan.rating,
       source: 'jikan'
     };
@@ -978,6 +987,17 @@ class AnimeSync {
       enriched.licensors = normalizedSources.jikan.licensors || [];
       enriched.altTitles = normalizedSources.jikan.altTitles || [];
     }
+
+    // Special handling: isAdult - if ANY source marks it as adult, it's adult
+    enriched.isAdult = (
+      normalizedSources.anilist?.isAdult === true ||
+      normalizedSources.jikan?.isAdult === true ||
+      normalizedSources.kitsu?.isAdult === true ||
+      // Also check genres for Hentai
+      enriched.genres?.some(g => g.toLowerCase() === 'hentai') ||
+      // Check themes for Hentai
+      enriched.themes?.some(t => t.toLowerCase() === 'hentai')
+    ) || false;
 
     // Fetch TMDB enrichment if we don't have it but have a title
     if (!sources.tmdb && (enriched.title || enriched.titleEnglish)) {

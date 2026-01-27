@@ -756,7 +756,7 @@ function createAnimeCard(anime) {
   
   // Dub badge
   const dubBadge = anime.hasDub ? `
-    <span class="card-dub-badge ${anime.dubConfidence >= 80 ? 'confirmed' : 'likely'}" 
+    <span class="card-dub-badge ${anime.dubStatus === 'confirmed' ? 'confirmed' : 'likely'}" 
           title="${anime.dubPlatforms?.join(', ') || 'English Dub Available'}">
       🎙️ DUB
     </span>` : '';

@@ -1,59 +1,103 @@
 /**
- * Robust Dub Checker Service
+ * Robust Dub Checker Service V2
  * 
- * Checks multiple sources to determine if an anime has an English dub:
- * 1. AniList - Check external links and streaming services
- * 2. MyAnimeList - Cross-reference via AniList MAL ID
- * 3. Jikan API (MAL) - Official MAL data
- * 4. TMDB - Watch providers and translations
- * 5. Known dub databases (Funimation/Crunchyroll patterns)
- * 6. Manual overrides from Firebase
+ * Multi-layered redundancy system for accurate English dub detection:
+ * 
+ * Layer 1 - Direct API Sources:
+ *   - AniList external links & streaming episodes
+ *   - MyAnimeList via Jikan API (licensors, producers)
+ *   - Kitsu streaming links with dub arrays
+ *   - TMDB watch providers & translations
+ * 
+ * Layer 2 - Streaming Platform Detection:
+ *   - Crunchyroll catalog check
+ *   - Funimation/Hidive patterns
+ *   - Netflix anime detection
+ * 
+ * Layer 3 - Heuristic Analysis:
+ *   - Known dub patterns (popular series, studios)
+ *   - English VA credits detection
+ *   - Release timing analysis
+ *   - Popularity-based prediction
+ * 
+ * Layer 4 - Community & Manual:
+ *   - Firebase shared dub database
+ *   - User-reported dubs
+ *   - Manual admin overrides
  */
 
 class DubChecker {
   constructor() {
     this.JIKAN_API = 'https://api.jikan.moe/v4';
     this.ANILIST_API = 'https://graphql.anilist.co';
-    this.RATE_LIMIT_MS = 1000; // Jikan rate limit
+    this.KITSU_API = 'https://kitsu.io/api/edge';
+    this.RATE_LIMIT_MS = 1000;
     
-    // Known streaming services that do dubs
+    // Streaming platforms known to offer English dubs
     this.DUB_PLATFORMS = {
-      'Crunchyroll': { hasDubs: true, checkPattern: true },
-      'Funimation': { hasDubs: true, checkPattern: true },
-      'Netflix': { hasDubs: true, checkPattern: true },
-      'Hulu': { hasDubs: true, checkPattern: true },
-      'Amazon Prime Video': { hasDubs: true, checkPattern: true },
-      'Disney+': { hasDubs: true, checkPattern: true },
-      'HBO Max': { hasDubs: true, checkPattern: true },
-      'Hidive': { hasDubs: true, checkPattern: true },
-      'Adult Swim': { hasDubs: true, checkPattern: true },
-      'Toonami': { hasDubs: true, checkPattern: true },
-      'Viz': { hasDubs: true, checkPattern: true },
-      'Sentai': { hasDubs: true, checkPattern: true },
-      'Aniplex': { hasDubs: true, checkPattern: true },
-      'Bang Zoom': { hasDubs: true, checkPattern: true }
+      'Crunchyroll': { hasDubs: true, priority: 1 },
+      'Funimation': { hasDubs: true, priority: 1 },
+      'Netflix': { hasDubs: true, priority: 1 },
+      'Hulu': { hasDubs: true, priority: 2 },
+      'Amazon Prime Video': { hasDubs: true, priority: 2 },
+      'Disney+': { hasDubs: true, priority: 1 },
+      'HBO Max': { hasDubs: true, priority: 2 },
+      'Max': { hasDubs: true, priority: 2 },
+      'Hidive': { hasDubs: true, priority: 1 },
+      'Adult Swim': { hasDubs: true, priority: 1 },
+      'Toonami': { hasDubs: true, priority: 1 },
+      'Viz': { hasDubs: true, priority: 2 },
+      'Sentai': { hasDubs: true, priority: 1 },
+      'Aniplex': { hasDubs: true, priority: 2 },
+      'Bang Zoom': { hasDubs: true, priority: 1 },
+      'Cartoon Network': { hasDubs: true, priority: 1 }
     };
 
-    // Studios known for dubbing
+    // Known English dubbing studios
     this.DUB_STUDIOS = [
-      'Funimation', 'Bang Zoom', 'Studiopolis', 'NYAV Post', 
+      'Funimation', 'Bang Zoom! Entertainment', 'Studiopolis', 'NYAV Post', 
       'Sound Cadence Studios', 'Okratron 5000', 'VSI Los Angeles',
-      'Spliced Bread Productions', 'Kocha Sound', 'PCB Productions'
+      'Spliced Bread Productions', 'Kocha Sound', 'PCB Productions',
+      'Ocean Productions', 'Blue Water Studios', 'Animaze', 'New Generation Pictures',
+      'SDPB Creative', 'Cup of Tea Productions', 'Headline Studios'
     ];
 
-    // Cache for dub info
+    // Known English voice actors (partial list for detection)
+    this.KNOWN_ENGLISH_VAS = [
+      'bryce papenbrook', 'johnny yong bosch', 'cristina vee', 'crispin freeman',
+      'laura bailey', 'travis willingham', 'matthew mercer', 'erica mendez',
+      'zach aguilar', 'alejandro saab', 'kayli mills', 'kira buckland',
+      'cherami leigh', 'todd haberkorn', 'j michael tatum', 'monica rial',
+      'chris sabat', 'stephanie sheh', 'tara strong', 'yuri lowenthal',
+      'steve blum', 'michelle ruff', 'keith silverstein', 'robbie daymond',
+      'max mittelman', 'xanthe huynh', 'suzie yeung', 'daman mills',
+      'billy kametz', 'aleks le', 'adam mcarthur', 'casey mongillo',
+      'abby trott', 'allegra clark', 'anairis quinones', 'marin miller',
+      'sarah wiedenheft', 'brina palencia', 'colleen clinkenbeard', 'jamie marchi'
+    ];
+
+    // Major licensors that typically dub their acquisitions
+    this.DUB_LICENSORS = [
+      'Funimation', 'Crunchyroll', 'Aniplex of America', 'Viz Media',
+      'Sentai Filmworks', 'GKIDS', 'Eleven Arts', 'Shout! Factory',
+      'Discotek Media', 'NIS America', 'Ponycan USA', 'Nozomi Entertainment'
+    ];
+
+    // Cache
     this.dubCache = new Map();
-    this.cacheExpiry = 24 * 60 * 60 * 1000; // 24 hours
+    this.cacheExpiry = 24 * 60 * 60 * 1000;
   }
 
   /**
-   * Main method - Check if anime has dub using multiple sources
-   * Prioritizes shared Firebase data to save API calls for all users
+   * Main method - Multi-layered dub detection with redundancy
+   * Uses parallel checking across all sources for accuracy
    */
   async checkDub(anime) {
     const animeId = anime.id || anime.anilistId;
     const malId = anime.malId || anime.idMal;
-    const title = anime.title || anime.titleRomaji;
+    const title = anime.title || anime.titleRomaji || anime.titleEnglish;
+    const titleEnglish = anime.titleEnglish;
+    const titleRomaji = anime.titleRomaji;
 
     // Check local cache first
     const cached = this.getFromCache(animeId);
@@ -63,13 +107,13 @@ class DubChecker {
 
     // Check if Firebase already has recent dub data (from another user)
     const existingData = await this.getExistingDubData(animeId);
-    if (existingData) {
-      console.log(`✅ Using cached dub data for: ${title}`);
+    if (existingData && existingData.confidence >= 70) {
+      console.log(`✅ Using cached dub data for: ${title} (confidence: ${existingData.confidence}%)`);
       this.saveToCache(animeId, existingData);
       return existingData;
     }
 
-    console.log(`🔍 Checking dub for: ${title}`);
+    console.log(`🔍 Multi-layer dub check for: ${title}`);
 
     const results = {
       hasDub: false,
@@ -78,39 +122,52 @@ class DubChecker {
       platforms: [],
       dubEpisodes: null,
       dubStatus: null,
+      englishVAs: [],
       lastChecked: Date.now()
     };
 
     try {
-      // Run all checks in parallel where possible
       const kitsuId = anime.kitsuId;
-      const checks = await Promise.allSettled([
+      
+      // LAYER 1: Run all primary API checks in parallel
+      const primaryChecks = await Promise.allSettled([
         this.checkAniListDub(animeId),
-        malId ? this.checkJikanDub(malId) : Promise.resolve(null),
-        this.checkFirebaseOverride(animeId),
-        this.checkKnownDubList(animeId, title),
-        this.checkTMDBDub(title, anime.year || anime.seasonYear),
-        this.checkKitsuDub(kitsuId, title)
+        malId ? this.checkJikanDubEnhanced(malId) : Promise.resolve(null),
+        this.checkKitsuDub(kitsuId, title),
+        this.checkTMDBDub(title, anime.year || anime.seasonYear)
       ]);
 
-      // Process AniList results
-      if (checks[0].status === 'fulfilled' && checks[0].value) {
-        const anilistResult = checks[0].value;
+      // LAYER 2: Check secondary sources
+      const secondaryChecks = await Promise.allSettled([
+        this.checkFirebaseOverride(animeId),
+        this.checkCommunityReports(animeId),
+        this.checkKnownDubListEnhanced(animeId, title, titleEnglish, titleRomaji),
+        this.checkEnglishVACredits(malId, animeId)
+      ]);
+
+      // LAYER 3: Heuristic checks (fast, no API calls)
+      const heuristicChecks = this.runHeuristicChecks(anime);
+
+      // Process LAYER 1 results
+      // AniList
+      if (primaryChecks[0].status === 'fulfilled' && primaryChecks[0].value) {
+        const anilistResult = primaryChecks[0].value;
         if (anilistResult.hasDub) {
           results.hasDub = true;
-          results.confidence += 30;
+          results.confidence += anilistResult.confidence || 25;
           results.sources.push('AniList');
           results.platforms.push(...(anilistResult.platforms || []));
         }
       }
 
-      // Process Jikan/MAL results
-      if (checks[1].status === 'fulfilled' && checks[1].value) {
-        const jikanResult = checks[1].value;
+      // Jikan/MAL (enhanced)
+      if (primaryChecks[1].status === 'fulfilled' && primaryChecks[1].value) {
+        const jikanResult = primaryChecks[1].value;
         if (jikanResult.hasDub) {
           results.hasDub = true;
-          results.confidence += 40;
+          results.confidence += jikanResult.confidence || 35;
           results.sources.push('MyAnimeList');
+          results.platforms.push(...(jikanResult.platforms || []));
           if (jikanResult.dubInfo) {
             results.dubStatus = jikanResult.dubInfo.status;
             results.dubEpisodes = jikanResult.dubInfo.episodes;
@@ -118,9 +175,36 @@ class DubChecker {
         }
       }
 
-      // Process Firebase override (highest priority)
-      if (checks[2].status === 'fulfilled' && checks[2].value) {
-        const override = checks[2].value;
+      // Kitsu
+      if (primaryChecks[2].status === 'fulfilled' && primaryChecks[2].value) {
+        const kitsuResult = primaryChecks[2].value;
+        if (kitsuResult.hasDub) {
+          results.hasDub = true;
+          results.confidence += kitsuResult.confidence || 30;
+          results.sources.push('Kitsu');
+          results.platforms.push(...(kitsuResult.platforms || []));
+        }
+      }
+
+      // TMDB
+      if (primaryChecks[3].status === 'fulfilled' && primaryChecks[3].value) {
+        const tmdbResult = primaryChecks[3].value;
+        if (tmdbResult.hasDub) {
+          results.hasDub = true;
+          results.confidence += tmdbResult.confidence || 20;
+          results.sources.push('TMDB');
+          results.platforms.push(...(tmdbResult.platforms || []));
+        }
+        if (tmdbResult.tmdbId) {
+          results.tmdbId = tmdbResult.tmdbId;
+          results.tmdbType = tmdbResult.tmdbType;
+        }
+      }
+
+      // Process LAYER 2 results
+      // Firebase override (highest priority)
+      if (secondaryChecks[0].status === 'fulfilled' && secondaryChecks[0].value) {
+        const override = secondaryChecks[0].value;
         results.hasDub = override.hasDub;
         results.confidence = 100;
         results.sources = ['Manual Override'];
@@ -129,55 +213,72 @@ class DubChecker {
         results.dubStatus = override.status || results.dubStatus;
       }
 
-      // Process known dub list
-      if (checks[3].status === 'fulfilled' && checks[3].value) {
-        const knownResult = checks[3].value;
+      // Community reports
+      if (secondaryChecks[1].status === 'fulfilled' && secondaryChecks[1].value) {
+        const communityResult = secondaryChecks[1].value;
+        if (communityResult.hasDub && communityResult.reportCount >= 2) {
+          results.hasDub = true;
+          results.confidence += Math.min(communityResult.reportCount * 10, 30);
+          results.sources.push('Community Reports');
+          results.platforms.push(...(communityResult.platforms || []));
+        }
+      }
+
+      // Known dub database (enhanced)
+      if (secondaryChecks[2].status === 'fulfilled' && secondaryChecks[2].value) {
+        const knownResult = secondaryChecks[2].value;
         if (knownResult.hasDub) {
           results.hasDub = true;
-          results.confidence += 30;
+          results.confidence += knownResult.confidence || 25;
           results.sources.push('Known Database');
           results.platforms.push(...(knownResult.platforms || []));
         }
       }
 
-      // Process TMDB results
-      if (checks[4].status === 'fulfilled' && checks[4].value) {
-        const tmdbResult = checks[4].value;
-        if (tmdbResult.hasDub) {
+      // English VA credits
+      if (secondaryChecks[3].status === 'fulfilled' && secondaryChecks[3].value) {
+        const vaResult = secondaryChecks[3].value;
+        if (vaResult.hasEnglishVAs) {
           results.hasDub = true;
-          results.confidence += tmdbResult.confidence || 20;
-          results.sources.push('TMDB');
-          results.platforms.push(...(tmdbResult.platforms || []));
-        }
-        // Store TMDB ID for later use
-        if (tmdbResult.tmdbId) {
-          results.tmdbId = tmdbResult.tmdbId;
-          results.tmdbType = tmdbResult.tmdbType;
+          results.confidence += vaResult.confidence || 40;
+          results.sources.push('English VA Credits');
+          results.englishVAs = vaResult.vas || [];
         }
       }
 
-      // Process Kitsu results
-      if (checks[5].status === 'fulfilled' && checks[5].value) {
-        const kitsuResult = checks[5].value;
-        if (kitsuResult.hasDub) {
+      // Process LAYER 3 (heuristics)
+      if (heuristicChecks.hasDub) {
+        if (!results.hasDub) {
           results.hasDub = true;
-          results.confidence += kitsuResult.confidence || 25;
-          results.sources.push('Kitsu');
-          results.platforms.push(...(kitsuResult.platforms || []));
+          results.confidence += heuristicChecks.confidence;
+        } else {
+          results.confidence += Math.floor(heuristicChecks.confidence / 2);
         }
+        results.sources.push(...heuristicChecks.sources);
       }
 
-      // Normalize confidence
+      // Normalize confidence (cap at 100)
       results.confidence = Math.min(results.confidence, 100);
 
-      // Remove duplicate platforms
+      // Remove duplicate platforms and sources
       results.platforms = [...new Set(results.platforms)];
+      results.sources = [...new Set(results.sources)];
+
+      // Apply confidence thresholds
+      if (results.confidence < 30 && results.hasDub) {
+        // Low confidence - mark as possible
+        results.dubStatus = 'possible';
+      } else if (results.confidence >= 70) {
+        results.dubStatus = results.dubStatus || 'confirmed';
+      }
 
       // Cache the result
       this.saveToCache(animeId, results);
 
-      // Save to Firebase for persistence
+      // Save to Firebase for persistence and sharing
       await this.saveDubInfo(animeId, results);
+
+      console.log(`✅ Dub check complete for ${title}: ${results.hasDub ? 'YES' : 'NO'} (${results.confidence}% confidence from ${results.sources.join(', ')})`);
 
       return results;
 
@@ -188,7 +289,384 @@ class DubChecker {
   }
 
   /**
-   * Check AniList for dub information
+   * LAYER 3: Run heuristic checks (no API calls, fast)
+   */
+  runHeuristicChecks(anime) {
+    const result = { hasDub: false, confidence: 0, sources: [] };
+    const title = (anime.title || anime.titleEnglish || anime.titleRomaji || '').toLowerCase();
+    
+    // Check 1: Popularity-based prediction
+    // Very popular anime (high popularity + good score) almost always get dubbed
+    if (anime.popularity > 200000 && (anime.score || 0) >= 70) {
+      result.confidence += 15;
+      result.sources.push('High Popularity');
+    } else if (anime.popularity > 100000 && (anime.score || 0) >= 75) {
+      result.confidence += 10;
+    }
+
+    // Check 2: Format check - Movies are more likely to be dubbed
+    if (anime.format === 'MOVIE' && anime.popularity > 50000) {
+      result.confidence += 10;
+      result.sources.push('Movie Format');
+    }
+
+    // Check 3: Sequel/Franchise check - If it's a sequel to a dubbed series
+    const sequelPatterns = [
+      /season\s*[2-9]|season\s*\d{2}/i,
+      /\b(2nd|3rd|4th|5th)\s*season/i,
+      /part\s*[2-9]/i,
+      /\bii\b|\biii\b|\biv\b/i,
+      /cour\s*2/i
+    ];
+    
+    for (const pattern of sequelPatterns) {
+      if (pattern.test(title)) {
+        result.confidence += 10;
+        result.sources.push('Sequel Detection');
+        break;
+      }
+    }
+
+    // Check 4: Studio check - Some studios consistently get dubbed
+    const dubbedStudios = [
+      'mappa', 'wit studio', 'ufotable', 'bones', 'madhouse', 
+      'a-1 pictures', 'cloverworks', 'kyoto animation', 'trigger',
+      'studio pierrot', 'toei animation', 'sunrise'
+    ];
+    
+    const studios = (anime.studios || []).map(s => s.toLowerCase());
+    if (studios.some(s => dubbedStudios.some(ds => s.includes(ds)))) {
+      if (anime.popularity > 50000) {
+        result.confidence += 8;
+      }
+    }
+
+    // Check 5: Genre check - Action/Shounen more likely to be dubbed
+    const dubbedGenres = ['action', 'adventure', 'fantasy', 'sci-fi', 'comedy'];
+    const genres = (anime.genres || []).map(g => g.toLowerCase());
+    if (genres.some(g => dubbedGenres.includes(g)) && anime.popularity > 30000) {
+      result.confidence += 5;
+    }
+
+    // Check 6: Recent release window - New popular anime get simuldubs
+    if (anime.status === 'RELEASING') {
+      const licensedPlatforms = ['crunchyroll', 'funimation', 'hidive', 'netflix'];
+      // If we know it's on a major platform, simuldub is likely
+      result.confidence += 5;
+    }
+
+    // Determine if heuristics suggest dub
+    if (result.confidence >= 20) {
+      result.hasDub = true;
+    }
+
+    return result;
+  }
+
+  /**
+   * Check for English VA credits in anime staff
+   */
+  async checkEnglishVACredits(malId, anilistId) {
+    const result = { hasEnglishVAs: false, vas: [], confidence: 0 };
+    
+    try {
+      // Try Jikan characters endpoint
+      if (malId) {
+        await this.delay(this.RATE_LIMIT_MS);
+        const response = await fetch(`${this.JIKAN_API}/anime/${malId}/characters`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          const characters = data?.data || [];
+          
+          for (const char of characters.slice(0, 10)) { // Check main characters
+            const voiceActors = char.voice_actors || [];
+            
+            for (const va of voiceActors) {
+              if (va.language === 'English') {
+                const vaName = va.person?.name?.toLowerCase() || '';
+                result.vas.push(va.person?.name);
+                result.hasEnglishVAs = true;
+                
+                // Bonus confidence if it's a known VA
+                if (this.KNOWN_ENGLISH_VAS.some(known => vaName.includes(known))) {
+                  result.confidence += 15;
+                } else {
+                  result.confidence += 8;
+                }
+              }
+            }
+          }
+          
+          // Cap confidence from VA check
+          result.confidence = Math.min(result.confidence, 50);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking VA credits:', error);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Check community-reported dubs
+   */
+  async checkCommunityReports(animeId) {
+    try {
+      const snapshot = await refs.syncLog.child('dubReports').child(animeId).once('value');
+      const reports = snapshot.val();
+      
+      if (!reports) return null;
+      
+      const reportList = Object.values(reports);
+      const dubReports = reportList.filter(r => r.hasDub === true);
+      const noDubReports = reportList.filter(r => r.hasDub === false);
+      
+      // Need at least 2 reports agreeing
+      if (dubReports.length >= 2 && dubReports.length > noDubReports.length) {
+        // Collect platforms from reports
+        const platforms = [...new Set(reportList.flatMap(r => r.platforms || []))];
+        
+        return {
+          hasDub: true,
+          reportCount: dubReports.length,
+          platforms,
+          confidence: Math.min(dubReports.length * 10, 30)
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error checking community reports:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Enhanced Jikan dub check with more signals
+   */
+  async checkJikanDubEnhanced(malId) {
+    try {
+      await this.delay(this.RATE_LIMIT_MS);
+
+      const response = await fetch(`${this.JIKAN_API}/anime/${malId}/full`);
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      const anime = data?.data;
+      if (!anime) return null;
+
+      const result = { hasDub: false, dubInfo: null, platforms: [], confidence: 0 };
+
+      // Check 1: Licensors (strongest signal)
+      const licensors = anime.licensors || [];
+      for (const licensor of licensors) {
+        if (this.DUB_LICENSORS.includes(licensor.name)) {
+          result.hasDub = true;
+          result.confidence += 25;
+          result.platforms.push(licensor.name);
+        }
+      }
+
+      // Check 2: Producers that do dubs
+      const producers = anime.producers || [];
+      for (const producer of producers) {
+        if (this.isDubCompany(producer.name)) {
+          result.hasDub = true;
+          result.confidence += 15;
+          result.platforms.push(producer.name);
+        }
+      }
+
+      // Check 3: Streaming availability
+      const streaming = anime.streaming || [];
+      for (const stream of streaming) {
+        if (this.DUB_PLATFORMS[stream.name]) {
+          result.platforms.push(stream.name);
+          result.confidence += 5;
+        }
+      }
+
+      // Check 4: Popularity + Major licensor = very likely dub
+      if (anime.score >= 7 && anime.members >= 100000) {
+        const hasMajorLicensor = licensors.some(l => 
+          ['Funimation', 'Crunchyroll', 'Aniplex of America', 'Viz Media', 'Sentai Filmworks'].includes(l.name)
+        );
+        if (hasMajorLicensor) {
+          result.hasDub = true;
+          result.confidence += 20;
+        }
+      }
+
+      // Check 5: External sites for dub mentions
+      if (anime.external) {
+        for (const ext of anime.external) {
+          const url = (ext.url || '').toLowerCase();
+          if (url.includes('dub') || url.includes('english')) {
+            result.hasDub = true;
+            result.confidence += 10;
+          }
+        }
+      }
+
+      result.confidence = Math.min(result.confidence, 50);
+      return result;
+
+    } catch (error) {
+      console.error('Jikan enhanced dub check error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Enhanced known dub list with more patterns
+   */
+  async checkKnownDubListEnhanced(animeId, title, titleEnglish, titleRomaji) {
+    try {
+      // Check Firebase known dubs collection first
+      const snapshot = await refs.syncLog.child('knownDubs').child(animeId).once('value');
+      const known = snapshot.val();
+      
+      if (known) {
+        return {
+          hasDub: true,
+          platforms: known.platforms || [],
+          episodes: known.episodes,
+          confidence: 35
+        };
+      }
+
+      // Comprehensive title-based pattern matching
+      const titlesToCheck = [title, titleEnglish, titleRomaji].filter(Boolean).map(t => t.toLowerCase());
+      
+      const dubPatterns = [
+        // Major ongoing/recent series
+        { pattern: /naruto|boruto/i, platforms: ['Crunchyroll', 'Hulu'], confidence: 35 },
+        { pattern: /one piece/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 35 },
+        { pattern: /dragon ball/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 35 },
+        { pattern: /my hero academia|boku no hero/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 35 },
+        { pattern: /demon slayer|kimetsu no yaiba/i, platforms: ['Crunchyroll', 'Funimation', 'Netflix'], confidence: 35 },
+        { pattern: /jujutsu kaisen/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /attack on titan|shingeki no kyojin/i, platforms: ['Crunchyroll', 'Funimation', 'Hulu'], confidence: 35 },
+        { pattern: /black clover/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 35 },
+        { pattern: /bleach/i, platforms: ['Hulu', 'Disney+'], confidence: 35 },
+        { pattern: /hunter.*hunter/i, platforms: ['Crunchyroll', 'Netflix'], confidence: 35 },
+        { pattern: /fullmetal alchemist/i, platforms: ['Crunchyroll', 'Funimation', 'Netflix'], confidence: 35 },
+        { pattern: /sword art online/i, platforms: ['Crunchyroll', 'Hulu', 'Netflix'], confidence: 35 },
+        { pattern: /re:?zero/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /konosuba/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /mob psycho/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /one punch man/i, platforms: ['Crunchyroll', 'Hulu', 'Netflix'], confidence: 35 },
+        { pattern: /spy.*family/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /chainsaw man/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /tokyo revengers/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /dr\.?\s*stone/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 35 },
+        { pattern: /fire force|enen no shouboutai/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 30 },
+        { pattern: /fairy tail/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 35 },
+        { pattern: /overlord/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 30 },
+        { pattern: /slime.*reincarnated|tensei.*slime/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /mushoku tensei/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 35 },
+        { pattern: /frieren/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /solo leveling/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /oshi no ko/i, platforms: ['Hidive'], confidence: 30 },
+        { pattern: /vinland saga/i, platforms: ['Crunchyroll', 'Netflix'], confidence: 35 },
+        { pattern: /made in abyss/i, platforms: ['Hidive'], confidence: 30 },
+        { pattern: /dandadan/i, platforms: ['Crunchyroll', 'Netflix'], confidence: 35 },
+        { pattern: /blue lock/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /bocchi.*rock/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /apothecary diaries|kusuriya/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /kaiju no\.?\s*8/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /wind breaker/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /dungeon meshi|delicious in dungeon/i, platforms: ['Netflix'], confidence: 35 },
+        { pattern: /hell.?s paradise|jigokuraku/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /zom\s*100/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /undead unluck/i, platforms: ['Hulu'], confidence: 30 },
+        { pattern: /eminence in shadow/i, platforms: ['Hidive'], confidence: 30 },
+        // More series
+        { pattern: /death note/i, platforms: ['Netflix', 'Crunchyroll'], confidence: 35 },
+        { pattern: /tokyo ghoul/i, platforms: ['Funimation', 'Hulu'], confidence: 35 },
+        { pattern: /code geass/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 35 },
+        { pattern: /steins.?gate/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 35 },
+        { pattern: /cowboy bebop/i, platforms: ['Crunchyroll', 'Netflix'], confidence: 35 },
+        { pattern: /neon genesis evangelion|evangelion/i, platforms: ['Netflix'], confidence: 35 },
+        { pattern: /your name|kimi no na wa/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /weathering with you/i, platforms: ['Netflix'], confidence: 35 },
+        { pattern: /a silent voice|koe no katachi/i, platforms: ['Netflix'], confidence: 35 },
+        { pattern: /violet evergarden/i, platforms: ['Netflix'], confidence: 35 },
+        { pattern: /cyberpunk.*edgerunners/i, platforms: ['Netflix'], confidence: 35 },
+        { pattern: /castlevania/i, platforms: ['Netflix'], confidence: 35 },
+        { pattern: /beastars/i, platforms: ['Netflix'], confidence: 35 },
+        { pattern: /baki/i, platforms: ['Netflix'], confidence: 35 },
+        { pattern: /kengan ashura/i, platforms: ['Netflix'], confidence: 35 },
+        { pattern: /sakamoto days/i, platforms: ['Netflix'], confidence: 35 },
+        { pattern: /ranking of kings|ousama ranking/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 30 },
+        { pattern: /to your eternity|fumetsu no anata/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /86.*eighty.?six|eighty.?six/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /spy classroom/i, platforms: ['Crunchyroll'], confidence: 25 },
+        { pattern: /blue exorcist|ao no exorcist/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /bungo stray dogs/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /haikyuu/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /kuroko.*basket/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /assassination classroom|ansatsu kyoushitsu/i, platforms: ['Funimation'], confidence: 35 },
+        { pattern: /food wars|shokugeki/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /promised neverland|yakusoku no neverland/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 35 },
+        { pattern: /dororo/i, platforms: ['Amazon Prime Video'], confidence: 30 },
+        { pattern: /goblin slayer/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 30 },
+        { pattern: /rising of the shield hero|tate no yuusha/i, platforms: ['Crunchyroll', 'Funimation'], confidence: 35 },
+        { pattern: /seven deadly sins|nanatsu no taizai/i, platforms: ['Netflix'], confidence: 35 },
+        { pattern: /black butler|kuroshitsuji/i, platforms: ['Funimation'], confidence: 30 },
+        { pattern: /soul eater/i, platforms: ['Funimation'], confidence: 35 },
+        { pattern: /noragami/i, platforms: ['Funimation'], confidence: 30 },
+        { pattern: /parasyte|kiseijuu/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /erased|boku dake ga inai machi/i, platforms: ['Crunchyroll', 'Netflix'], confidence: 35 },
+        { pattern: /akame ga kill/i, platforms: ['Crunchyroll'], confidence: 30 },
+        { pattern: /kill la kill/i, platforms: ['Crunchyroll'], confidence: 35 },
+        { pattern: /gurren lagann|tengen toppa/i, platforms: ['Crunchyroll'], confidence: 35 }
+      ];
+
+      for (const titleToCheck of titlesToCheck) {
+        for (const { pattern, platforms, confidence } of dubPatterns) {
+          if (pattern.test(titleToCheck)) {
+            return { hasDub: true, platforms, confidence };
+          }
+        }
+      }
+
+      return null;
+
+    } catch (error) {
+      console.error('Known dub check error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Report a dub (community contribution)
+   */
+  async reportDub(animeId, hasDub, platforms = [], userId = 'anonymous') {
+    try {
+      const reportId = `${userId}_${Date.now()}`;
+      await refs.syncLog.child('dubReports').child(animeId).child(reportId).set({
+        hasDub,
+        platforms,
+        reportedBy: userId,
+        reportedAt: Date.now()
+      });
+      
+      // Invalidate cache
+      this.dubCache.delete(animeId);
+      
+      console.log(`📝 Dub report submitted for ${animeId}: ${hasDub ? 'HAS DUB' : 'NO DUB'}`);
+      return true;
+    } catch (error) {
+      console.error('Error reporting dub:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check AniList for dub information (enhanced)
    */
   async checkAniListDub(anilistId) {
     const numericId = parseInt(String(anilistId).replace('al_', ''));
@@ -321,68 +799,10 @@ class DubChecker {
   }
 
   /**
-   * Check Jikan (MAL) API for dub information
+   * Check Jikan (MAL) API for dub information - redirects to enhanced version
    */
   async checkJikanDub(malId) {
-    try {
-      // Rate limit
-      await this.delay(this.RATE_LIMIT_MS);
-
-      // Get anime details
-      const response = await fetch(`${this.JIKAN_API}/anime/${malId}/full`);
-      
-      if (!response.ok) {
-        throw new Error(`Jikan API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const anime = data?.data;
-
-      if (!anime) return null;
-
-      const result = { hasDub: false, dubInfo: null, platforms: [] };
-
-      // Check producers/licensors for dub companies
-      const allCompanies = [
-        ...(anime.producers || []),
-        ...(anime.licensors || []),
-        ...(anime.studios || [])
-      ];
-
-      for (const company of allCompanies) {
-        const name = company.name || company;
-        if (this.isDubCompany(name)) {
-          result.hasDub = true;
-          result.platforms.push(name);
-        }
-      }
-
-      // Check if there are English streaming links
-      if (anime.streaming) {
-        for (const stream of anime.streaming) {
-          if (this.DUB_PLATFORMS[stream.name]) {
-            result.platforms.push(stream.name);
-          }
-        }
-      }
-
-      // Funimation/Crunchyroll typically dub popular anime (score > 7, members > 100k)
-      if (anime.score >= 7 && anime.members >= 100000) {
-        // High chance of dub for popular shows
-        const hasMajorLicensor = allCompanies.some(c => 
-          ['Funimation', 'Crunchyroll', 'Aniplex of America', 'Viz Media', 'Sentai Filmworks'].includes(c.name)
-        );
-        if (hasMajorLicensor) {
-          result.hasDub = true;
-        }
-      }
-
-      return result;
-
-    } catch (error) {
-      console.error('Jikan dub check error:', error);
-      return null;
-    }
+    return this.checkJikanDubEnhanced(malId);
   }
 
   /**
@@ -399,80 +819,10 @@ class DubChecker {
   }
 
   /**
-   * Check against known dub database
+   * Check against known dub database - redirects to enhanced version
    */
   async checkKnownDubList(animeId, title) {
-    // Get from Firebase known dubs collection
-    try {
-      const snapshot = await refs.syncLog.child('knownDubs').child(animeId).once('value');
-      const known = snapshot.val();
-      
-      if (known) {
-        return {
-          hasDub: true,
-          platforms: known.platforms || [],
-          episodes: known.episodes
-        };
-      }
-
-      // Title-based pattern matching for common dubbed series
-      const dubPatterns = [
-        // Big shonen
-        { pattern: /naruto|boruto/i, platforms: ['Crunchyroll', 'Hulu'] },
-        { pattern: /one piece/i, platforms: ['Crunchyroll', 'Funimation'] },
-        { pattern: /dragon ball/i, platforms: ['Crunchyroll', 'Funimation'] },
-        { pattern: /my hero academia|boku no hero/i, platforms: ['Crunchyroll', 'Funimation'] },
-        { pattern: /demon slayer|kimetsu no yaiba/i, platforms: ['Crunchyroll', 'Funimation'] },
-        { pattern: /jujutsu kaisen/i, platforms: ['Crunchyroll'] },
-        { pattern: /attack on titan|shingeki no kyojin/i, platforms: ['Crunchyroll', 'Funimation'] },
-        { pattern: /black clover/i, platforms: ['Crunchyroll', 'Funimation'] },
-        { pattern: /bleach/i, platforms: ['Hulu', 'Disney+'] },
-        { pattern: /hunter.*hunter/i, platforms: ['Crunchyroll', 'Netflix'] },
-        { pattern: /fullmetal alchemist/i, platforms: ['Crunchyroll', 'Funimation'] },
-        { pattern: /sword art online/i, platforms: ['Crunchyroll', 'Hulu'] },
-        { pattern: /re:zero|re zero/i, platforms: ['Crunchyroll'] },
-        { pattern: /konosuba/i, platforms: ['Crunchyroll'] },
-        { pattern: /mob psycho/i, platforms: ['Crunchyroll'] },
-        { pattern: /one punch man/i, platforms: ['Crunchyroll', 'Hulu'] },
-        { pattern: /spy.*family/i, platforms: ['Crunchyroll'] },
-        { pattern: /chainsaw man/i, platforms: ['Crunchyroll'] },
-        { pattern: /tokyo revengers/i, platforms: ['Crunchyroll'] },
-        { pattern: /dr\.?\s*stone/i, platforms: ['Crunchyroll', 'Funimation'] },
-        { pattern: /fire force|enen no shouboutai/i, platforms: ['Crunchyroll', 'Funimation'] },
-        { pattern: /fairy tail/i, platforms: ['Crunchyroll', 'Funimation'] },
-        { pattern: /overlord/i, platforms: ['Crunchyroll', 'Funimation'] },
-        { pattern: /that time i got reincarnated as a slime|tensei shitara slime/i, platforms: ['Crunchyroll'] },
-        { pattern: /mushoku tensei/i, platforms: ['Crunchyroll', 'Funimation'] },
-        { pattern: /frieren/i, platforms: ['Crunchyroll'] },
-        { pattern: /solo leveling/i, platforms: ['Crunchyroll'] },
-        { pattern: /oshi no ko/i, platforms: ['Hidive'] },
-        { pattern: /vinland saga/i, platforms: ['Crunchyroll', 'Netflix'] },
-        { pattern: /made in abyss/i, platforms: ['Hidive'] },
-        { pattern: /dandadan/i, platforms: ['Crunchyroll', 'Netflix'] },
-        { pattern: /blue lock/i, platforms: ['Crunchyroll'] },
-        { pattern: /bocchi the rock/i, platforms: ['Crunchyroll'] },
-        { pattern: /the apothecary diaries|kusuriya no hitorigoto/i, platforms: ['Crunchyroll'] },
-        { pattern: /kaiju no\.?\s*8/i, platforms: ['Crunchyroll'] },
-        { pattern: /wind breaker/i, platforms: ['Crunchyroll'] },
-        { pattern: /delicious in dungeon|dungeon meshi/i, platforms: ['Netflix'] },
-        { pattern: /hell.?s paradise|jigokuraku/i, platforms: ['Crunchyroll'] },
-        { pattern: /zom\s*100/i, platforms: ['Crunchyroll'] },
-        { pattern: /undead unluck/i, platforms: ['Hulu'] },
-        { pattern: /eminence in shadow/i, platforms: ['Hidive'] }
-      ];
-
-      for (const { pattern, platforms } of dubPatterns) {
-        if (pattern.test(title)) {
-          return { hasDub: true, platforms };
-        }
-      }
-
-      return null;
-
-    } catch (error) {
-      console.error('Known dub check error:', error);
-      return null;
-    }
+    return this.checkKnownDubListEnhanced(animeId, title, null, null);
   }
 
   /**

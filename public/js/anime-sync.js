@@ -1258,7 +1258,7 @@ class AnimeSync {
    * Save enriched anime to Firebase
    */
   async saveEnrichedAnime(enrichedAnime, syncedSeason = null, syncedYear = null) {
-    // Determine canonical Firebase ID
+    // Determine canonical Firebase ID (prefer AniList > MAL > Kitsu > Title)
     let animeId;
     if (enrichedAnime.anilistId) {
       animeId = `al_${enrichedAnime.anilistId}`;
@@ -1274,9 +1274,46 @@ class AnimeSync {
       animeId = `title_${titleSlug}`;
     }
 
+    // Check for and clean up duplicate entries (e.g., mal_X when we're saving al_X)
+    const duplicatesToRemove = [];
+    if (enrichedAnime.anilistId && enrichedAnime.malId) {
+      // We're saving as al_X, check if mal_X exists
+      const malKey = `mal_${enrichedAnime.malId}`;
+      if (animeId !== malKey) {
+        const malSnapshot = await refs.anime.child(malKey).once('value');
+        if (malSnapshot.exists()) {
+          console.log(`🧹 Found duplicate: ${malKey} (will merge into ${animeId})`);
+          duplicatesToRemove.push({ key: malKey, data: malSnapshot.val() });
+        }
+      }
+    }
+    if (enrichedAnime.anilistId && enrichedAnime.kitsuId) {
+      const kitsuKey = `kitsu_${enrichedAnime.kitsuId}`;
+      if (animeId !== kitsuKey) {
+        const kitsuSnapshot = await refs.anime.child(kitsuKey).once('value');
+        if (kitsuSnapshot.exists()) {
+          console.log(`🧹 Found duplicate: ${kitsuKey} (will merge into ${animeId})`);
+          duplicatesToRemove.push({ key: kitsuKey, data: kitsuSnapshot.val() });
+        }
+      }
+    }
+
     // Get existing data to preserve user contributions
     const existingSnapshot = await refs.anime.child(animeId).once('value');
-    const existing = existingSnapshot.val() || {};
+    let existing = existingSnapshot.val() || {};
+
+    // Merge data from duplicates before removing them
+    for (const dup of duplicatesToRemove) {
+      // Preserve any user-contributed data from duplicates
+      if (dup.data.hasDub && !existing.hasDub) existing.hasDub = dup.data.hasDub;
+      if (dup.data.dubConfidence && !existing.dubConfidence) existing.dubConfidence = dup.data.dubConfidence;
+      if (dup.data.dubPlatforms && !existing.dubPlatforms) existing.dubPlatforms = dup.data.dubPlatforms;
+      if (dup.data.dubStatus && !existing.dubStatus) existing.dubStatus = dup.data.dubStatus;
+      // Merge IDs
+      if (dup.data.malId && !existing.malId) existing.malId = dup.data.malId;
+      if (dup.data.anilistId && !existing.anilistId) existing.anilistId = dup.data.anilistId;
+      if (dup.data.kitsuId && !existing.kitsuId) existing.kitsuId = dup.data.kitsuId;
+    }
 
     // Use synced season/year as fallback if API data is missing
     const finalSeason = enrichedAnime.season || existing.season || syncedSeason;
@@ -1368,7 +1405,18 @@ class AnimeSync {
     if (isNew) animeData.createdAt = Date.now();
 
     await refs.anime.child(animeId).update(animeData);
-    return { isNew, id: animeId };
+
+    // Remove duplicates after saving canonical entry
+    for (const dup of duplicatesToRemove) {
+      try {
+        await refs.anime.child(dup.key).remove();
+        console.log(`🧹 Removed duplicate entry: ${dup.key}`);
+      } catch (err) {
+        console.warn(`Failed to remove duplicate ${dup.key}:`, err);
+      }
+    }
+
+    return { isNew, id: animeId, duplicatesRemoved: duplicatesToRemove.length };
   }
 
   /**
@@ -2641,6 +2689,83 @@ class AnimeSync {
 
   sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Clean up duplicate anime entries in Firebase
+   * Consolidates mal_X and kitsu_X entries into canonical al_X entries
+   */
+  async cleanupDuplicates() {
+    console.log('🧹 Starting duplicate cleanup...');
+    
+    const snapshot = await refs.anime.once('value');
+    const allAnime = snapshot.val() || {};
+    
+    const byMalId = new Map();
+    const byAnilistId = new Map();
+    const duplicates = [];
+    
+    // First pass: index all entries
+    for (const [key, anime] of Object.entries(allAnime)) {
+      if (anime.malId) {
+        if (!byMalId.has(anime.malId)) byMalId.set(anime.malId, []);
+        byMalId.get(anime.malId).push({ key, anime });
+      }
+      if (anime.anilistId) {
+        if (!byAnilistId.has(anime.anilistId)) byAnilistId.set(anime.anilistId, []);
+        byAnilistId.get(anime.anilistId).push({ key, anime });
+      }
+    }
+    
+    // Find duplicates (same malId but different keys)
+    for (const [malId, entries] of byMalId) {
+      if (entries.length > 1) {
+        // Keep the al_ prefixed one, or the first one
+        const canonical = entries.find(e => e.key.startsWith('al_')) || entries[0];
+        const dupes = entries.filter(e => e.key !== canonical.key);
+        
+        for (const dupe of dupes) {
+          duplicates.push({
+            keep: canonical.key,
+            remove: dupe.key,
+            malId,
+            title: dupe.anime.title
+          });
+        }
+      }
+    }
+    
+    console.log(`Found ${duplicates.length} duplicate entries to clean`);
+    
+    // Remove duplicates
+    let removed = 0;
+    for (const dup of duplicates) {
+      try {
+        // Merge any user data from duplicate to canonical
+        const canonical = allAnime[dup.keep];
+        const duplicate = allAnime[dup.remove];
+        
+        // Preserve dub data
+        if (duplicate.hasDub && !canonical.hasDub) {
+          await refs.anime.child(dup.keep).update({
+            hasDub: duplicate.hasDub,
+            dubConfidence: duplicate.dubConfidence,
+            dubPlatforms: duplicate.dubPlatforms,
+            dubStatus: duplicate.dubStatus
+          });
+        }
+        
+        // Remove duplicate
+        await refs.anime.child(dup.remove).remove();
+        console.log(`✅ Removed duplicate: ${dup.remove} (kept: ${dup.keep})`);
+        removed++;
+      } catch (err) {
+        console.error(`Failed to remove ${dup.remove}:`, err);
+      }
+    }
+    
+    console.log(`🧹 Cleanup complete: removed ${removed} duplicates`);
+    return { found: duplicates.length, removed };
   }
 }
 

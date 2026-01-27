@@ -86,6 +86,11 @@ class DubChecker {
     // Cache
     this.dubCache = new Map();
     this.cacheExpiry = 24 * 60 * 60 * 1000;
+    
+    // Jikan rate limiting queue (3 requests per second max)
+    this.jikanQueue = [];
+    this.jikanProcessing = false;
+    this.JIKAN_RATE_MS = 350; // ~3 requests per second
   }
 
   /**
@@ -129,29 +134,30 @@ class DubChecker {
     try {
       const kitsuId = anime.kitsuId;
       
-      // LAYER 1: Run all primary API checks in parallel
-      const primaryChecks = await Promise.allSettled([
+      // Run heuristic checks first (instant, no API calls)
+      const heuristicChecks = this.runHeuristicChecks(anime);
+      
+      // OPTIMIZED: Run ALL API checks in parallel (Layer 1 + Layer 2 combined)
+      const allChecks = await Promise.allSettled([
+        // Layer 1 - Primary APIs
         this.checkAniListDub(animeId),
         malId ? this.checkJikanDubEnhanced(malId) : Promise.resolve(null),
         this.checkKitsuDub(kitsuId, title),
-        this.checkTMDBDub(title, anime.year || anime.seasonYear)
-      ]);
-
-      // LAYER 2: Check secondary sources
-      const secondaryChecks = await Promise.allSettled([
+        this.checkTMDBDub(title, anime.year || anime.seasonYear),
+        // Layer 2 - Secondary sources (independent, can run in parallel)
         this.checkFirebaseOverride(animeId),
         this.checkCommunityReports(animeId),
         this.checkKnownDubListEnhanced(animeId, title, titleEnglish, titleRomaji),
         this.checkEnglishVACredits(malId, animeId)
       ]);
 
-      // LAYER 3: Heuristic checks (fast, no API calls)
-      const heuristicChecks = this.runHeuristicChecks(anime);
+      // Map results for easier access
+      const [anilistCheck, jikanCheck, kitsuCheck, tmdbCheck, 
+             overrideCheck, communityCheck, knownCheck, vaCheck] = allChecks;
 
-      // Process LAYER 1 results
-      // AniList
-      if (primaryChecks[0].status === 'fulfilled' && primaryChecks[0].value) {
-        const anilistResult = primaryChecks[0].value;
+      // Process results - AniList
+      if (anilistCheck.status === 'fulfilled' && anilistCheck.value) {
+        const anilistResult = anilistCheck.value;
         if (anilistResult.hasDub) {
           results.hasDub = true;
           results.confidence += anilistResult.confidence || 25;
@@ -161,8 +167,8 @@ class DubChecker {
       }
 
       // Jikan/MAL (enhanced)
-      if (primaryChecks[1].status === 'fulfilled' && primaryChecks[1].value) {
-        const jikanResult = primaryChecks[1].value;
+      if (jikanCheck.status === 'fulfilled' && jikanCheck.value) {
+        const jikanResult = jikanCheck.value;
         if (jikanResult.hasDub) {
           results.hasDub = true;
           results.confidence += jikanResult.confidence || 35;
@@ -176,8 +182,8 @@ class DubChecker {
       }
 
       // Kitsu
-      if (primaryChecks[2].status === 'fulfilled' && primaryChecks[2].value) {
-        const kitsuResult = primaryChecks[2].value;
+      if (kitsuCheck.status === 'fulfilled' && kitsuCheck.value) {
+        const kitsuResult = kitsuCheck.value;
         if (kitsuResult.hasDub) {
           results.hasDub = true;
           results.confidence += kitsuResult.confidence || 30;
@@ -187,8 +193,8 @@ class DubChecker {
       }
 
       // TMDB
-      if (primaryChecks[3].status === 'fulfilled' && primaryChecks[3].value) {
-        const tmdbResult = primaryChecks[3].value;
+      if (tmdbCheck.status === 'fulfilled' && tmdbCheck.value) {
+        const tmdbResult = tmdbCheck.value;
         if (tmdbResult.hasDub) {
           results.hasDub = true;
           results.confidence += tmdbResult.confidence || 20;
@@ -201,10 +207,10 @@ class DubChecker {
         }
       }
 
-      // Process LAYER 2 results
+      // Process secondary results
       // Firebase override (highest priority)
-      if (secondaryChecks[0].status === 'fulfilled' && secondaryChecks[0].value) {
-        const override = secondaryChecks[0].value;
+      if (overrideCheck.status === 'fulfilled' && overrideCheck.value) {
+        const override = overrideCheck.value;
         results.hasDub = override.hasDub;
         results.confidence = 100;
         results.sources = ['Manual Override'];
@@ -214,8 +220,8 @@ class DubChecker {
       }
 
       // Community reports
-      if (secondaryChecks[1].status === 'fulfilled' && secondaryChecks[1].value) {
-        const communityResult = secondaryChecks[1].value;
+      if (communityCheck.status === 'fulfilled' && communityCheck.value) {
+        const communityResult = communityCheck.value;
         if (communityResult.hasDub && communityResult.reportCount >= 2) {
           results.hasDub = true;
           results.confidence += Math.min(communityResult.reportCount * 10, 30);
@@ -225,8 +231,8 @@ class DubChecker {
       }
 
       // Known dub database (enhanced)
-      if (secondaryChecks[2].status === 'fulfilled' && secondaryChecks[2].value) {
-        const knownResult = secondaryChecks[2].value;
+      if (knownCheck.status === 'fulfilled' && knownCheck.value) {
+        const knownResult = knownCheck.value;
         if (knownResult.hasDub) {
           results.hasDub = true;
           results.confidence += knownResult.confidence || 25;
@@ -236,8 +242,8 @@ class DubChecker {
       }
 
       // English VA credits
-      if (secondaryChecks[3].status === 'fulfilled' && secondaryChecks[3].value) {
-        const vaResult = secondaryChecks[3].value;
+      if (vaCheck.status === 'fulfilled' && vaCheck.value) {
+        const vaResult = vaCheck.value;
         if (vaResult.hasEnglishVAs) {
           results.hasDub = true;
           results.confidence += vaResult.confidence || 40;
@@ -246,7 +252,7 @@ class DubChecker {
         }
       }
 
-      // Process LAYER 3 (heuristics)
+      // Process heuristics (already computed at start)
       if (heuristicChecks.hasDub) {
         if (!results.hasDub) {
           results.hasDub = true;
@@ -372,7 +378,8 @@ class DubChecker {
     try {
       // Try Jikan characters endpoint
       if (malId) {
-        await this.delay(this.RATE_LIMIT_MS);
+        // Small delay to stagger Jikan requests
+        await this.delay(this.JIKAN_RATE_MS);
         const response = await fetch(`${this.JIKAN_API}/anime/${malId}/characters`);
         
         if (response.ok) {
@@ -448,7 +455,8 @@ class DubChecker {
    */
   async checkJikanDubEnhanced(malId) {
     try {
-      await this.delay(this.RATE_LIMIT_MS);
+      // Small delay to stagger Jikan requests
+      await this.delay(this.JIKAN_RATE_MS);
 
       const response = await fetch(`${this.JIKAN_API}/anime/${malId}/full`);
       if (!response.ok) return null;
@@ -953,31 +961,63 @@ class DubChecker {
   }
 
   /**
-   * Batch check dubs for multiple anime
+   * Batch check dubs for multiple anime with parallel processing
+   * @param {Array} animeList - List of anime to check
+   * @param {Function} onProgress - Progress callback
+   * @param {number} concurrency - Number of concurrent checks (default 5)
    */
-  async batchCheckDubs(animeList, onProgress = null) {
+  async batchCheckDubs(animeList, onProgress = null, concurrency = 5) {
     const results = [];
     const total = animeList.length;
+    let completed = 0;
 
-    for (let i = 0; i < animeList.length; i++) {
-      const anime = animeList[i];
+    console.log(`🚀 Starting parallel dub check for ${total} anime (concurrency: ${concurrency})`);
+    const startTime = Date.now();
+
+    // Process in batches with controlled concurrency
+    for (let i = 0; i < animeList.length; i += concurrency) {
+      const batch = animeList.slice(i, Math.min(i + concurrency, animeList.length));
       
-      if (onProgress) {
-        onProgress(Math.round((i / total) * 100), `Checking dub ${i + 1}/${total}...`);
-      }
-
-      const result = await this.checkDub(anime);
-      results.push({
-        animeId: anime.id,
-        title: anime.title,
-        ...result
+      // Run batch in parallel
+      const batchPromises = batch.map(async (anime) => {
+        try {
+          const result = await this.checkDub(anime);
+          return {
+            animeId: anime.id,
+            title: anime.title,
+            ...result
+          };
+        } catch (error) {
+          console.error(`Error checking dub for ${anime.title}:`, error);
+          return {
+            animeId: anime.id,
+            title: anime.title,
+            hasDub: false,
+            confidence: 0,
+            error: true
+          };
+        }
       });
 
-      // Rate limiting between checks
-      if (anime.malId) {
-        await this.delay(this.RATE_LIMIT_MS);
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+      
+      completed += batch.length;
+      if (onProgress) {
+        onProgress(
+          Math.round((completed / total) * 100), 
+          `Checking dubs ${completed}/${total}...`
+        );
+      }
+
+      // Small delay between batches to avoid overwhelming APIs
+      if (i + concurrency < animeList.length) {
+        await this.delay(200);
       }
     }
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`✅ Parallel dub check complete: ${total} anime in ${elapsed}s`);
 
     return results;
   }

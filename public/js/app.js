@@ -506,9 +506,8 @@ async function loadAnimeWithSync() {
                        isCurrentSeason(currentSeason, currentYear) ? 'current' : 'future';
     console.log(`⚡ Instant load from cache: ${cachedAnime.length} anime (${seasonType} season)`);
     animeCache = cachedAnime;
-    animeCache.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
     updateStats();
-    renderAnimeGrid(animeCache);
+    filterAnime();
     
     // Still refresh from Firebase in background for any updates
     // (but the refresh function will skip if not needed for finished seasons)
@@ -588,9 +587,8 @@ async function refreshFromFirebaseInBackground() {
     if (mergeResult.added > 0 || mergeResult.updated > 0) {
       console.log('🔄 Background refresh found changes - updating display');
       animeCache = mergeResult.anime || freshAnime;
-      animeCache.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
       updateStats();
-      renderAnimeGrid(animeCache);
+      filterAnime();
     }
   } catch (error) {
     console.warn('Background refresh failed:', error);
@@ -608,9 +606,8 @@ async function loadAnime() {
   if (cachedAnime && cachedAnime.length > 0) {
     console.log(`⚡ Using cached anime: ${cachedAnime.length} titles`);
     animeCache = cachedAnime;
-    animeCache.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
     updateStats();
-    renderAnimeGrid(animeCache);
+    filterAnime();
     
     // Check dubs in background (don't await)
     setTimeout(() => checkDubsInBackground(), 2000);
@@ -635,17 +632,14 @@ async function loadAnime() {
       }
     });
 
-    // Sort by popularity by default
-    animeCache.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-
     // Save to local cache for fast switching
     localCache.save(currentSeason, currentYear, animeCache);
 
     // Update stats
     updateStats();
 
-    // Render
-    renderAnimeGrid(animeCache);
+    // Apply filters and render
+    filterAnime();
 
     // Check dubs in background (don't await)
     setTimeout(() => checkDubsInBackground(), 2000);

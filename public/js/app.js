@@ -1323,8 +1323,8 @@ function showPage(page) {
       break;
       
     case 'dub-radar':
-      // Show only dubbed anime
-      loadAllAiringAnime(true); // true = dubs only
+      // Show ALL dubbed anime from Firebase
+      loadAllDubbedAnime();
       if (seasonNav) seasonNav.style.display = 'none';
       document.getElementById('seasonTitle').textContent = '🎙️ Dub Radar - All Dubbed';
       break;
@@ -1345,6 +1345,46 @@ function showPage(page) {
           link.classList.add('active');
         }
       });
+  }
+}
+
+/**
+ * Load ALL dubbed anime from Firebase (all seasons, all statuses)
+ */
+async function loadAllDubbedAnime() {
+  const grid = document.getElementById('animeGrid');
+  grid.innerHTML = '<div class="loading">Loading all dubbed anime...</div>';
+  
+  try {
+    // Query all anime with hasDub = true
+    const snapshot = await refs.anime.orderByChild('hasDub').equalTo(true).once('value');
+    
+    animeCache = [];
+    snapshot.forEach(child => {
+      const anime = { id: child.key, ...child.val() };
+      // Filter out adult content by default
+      const showAdult = document.getElementById('adultFilter')?.checked || false;
+      if (!showAdult && anime.isAdult) return;
+      
+      animeCache.push(anime);
+    });
+    
+    // Sort by popularity
+    animeCache.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    
+    // Update stats
+    const airingCount = animeCache.filter(a => a.status === 'RELEASING').length;
+    const dubbedCount = animeCache.length;
+    document.getElementById('statTotal').textContent = animeCache.length;
+    document.getElementById('statAiring').textContent = airingCount;
+    document.getElementById('statDubbed').textContent = dubbedCount;
+    
+    // Render
+    filterAnime();
+    
+  } catch (error) {
+    console.error('Error loading dubbed anime:', error);
+    grid.innerHTML = '<div class="error">Error loading anime. Please try again.</div>';
   }
 }
 

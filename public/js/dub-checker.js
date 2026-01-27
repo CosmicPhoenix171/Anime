@@ -710,15 +710,24 @@ class DubChecker {
       if (!media) return null;
 
       const result = { hasDub: false, platforms: [] };
+      
+      // Sites to exclude from platforms (not streaming services)
+      const excludedSites = [
+        'Official Site', 'Twitter', 'Facebook', 'Instagram', 'YouTube', 
+        'TikTok', 'Tumblr', 'Reddit', 'Discord', 'Wikipedia', 'AniDB',
+        'Anime-Planet', 'Anime News Network', 'MyAnimeList', 'AniList'
+      ];
 
       // Check external links for dub platforms
       if (media.externalLinks) {
         for (const link of media.externalLinks) {
-          // Check if link mentions dub or English
-          if (link.language === 'English' || 
-              (link.site && this.DUB_PLATFORMS[link.site])) {
+          const siteName = link.site || '';
+          const isExcluded = excludedSites.some(ex => siteName.toLowerCase().includes(ex.toLowerCase()));
+          
+          // Only add if it's a known dub platform (not just any English link)
+          if (!isExcluded && this.DUB_PLATFORMS[siteName]) {
             result.hasDub = true;
-            result.platforms.push(link.site);
+            result.platforms.push(siteName);
           }
           
           // Check URL for dub indicators

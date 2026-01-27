@@ -1317,6 +1317,143 @@ footer p {
   font-weight: 400;
 }
 
+/* Genre Multi-Select Filter */
+.genre-filter-container {
+  position: relative;
+}
+
+.genre-filter-btn {
+  padding: 0.65rem 1.25rem;
+  border: 2px solid #e8e8f0;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #555;
+  background: linear-gradient(180deg, #fff 0%, #f8f9ff 100%);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 120px;
+  text-align: left;
+}
+
+.genre-filter-btn:hover {
+  border-color: #c5c5e8;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+}
+
+.genre-filter-btn.has-selection {
+  border-color: #667eea;
+  background: linear-gradient(180deg, #f0f3ff 0%, #e8ecff 100%);
+  color: #667eea;
+}
+
+.genre-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  border: 2px solid #e8e8f0;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  min-width: 220px;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.genre-dropdown.open {
+  max-height: 400px;
+  opacity: 1;
+  visibility: visible;
+}
+
+.genre-dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #eee;
+  font-weight: 600;
+  color: #444;
+}
+
+.genre-clear-btn {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.genre-clear-btn:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.genre-options {
+  padding: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+}
+
+.genre-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #555;
+  transition: all 0.2s ease;
+}
+
+.genre-options label:hover {
+  background: rgba(102, 126, 234, 0.08);
+}
+
+.genre-options input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #667eea;
+  cursor: pointer;
+}
+
+.genre-options input[type="checkbox"]:checked + span,
+.genre-options label:has(input:checked) {
+  color: #667eea;
+  font-weight: 500;
+}
+
+/* Custom scrollbar for genre options */
+.genre-options::-webkit-scrollbar {
+  width: 6px;
+}
+
+.genre-options::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.genre-options::-webkit-scrollbar-thumb {
+  background: #c5c5e8;
+  border-radius: 3px;
+}
+
+.genre-options::-webkit-scrollbar-thumb:hover {
+  background: #667eea;
+}
+
 .search-input {
   flex: 1;
   min-width: 200px;
@@ -2388,8 +2525,19 @@ footer p {
   }
 
   .filter-bar select,
-  .filter-bar input {
+  .filter-bar input,
+  .genre-filter-btn {
     width: 100%;
+  }
+
+  .genre-filter-container {
+    width: 100%;
+  }
+
+  .genre-dropdown {
+    width: 100%;
+    left: 0;
+    right: 0;
   }
 
   .toggle-filter {

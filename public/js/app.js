@@ -475,6 +475,9 @@ function setupEventListeners() {
   document.getElementById('sortFilter')?.addEventListener('change', filterAnime);
   document.getElementById('adultFilter')?.addEventListener('change', filterAnime);
 
+  // Genre filter dropdown
+  setupGenreFilter();
+
   // Search with debounce
   document.getElementById('searchInput')?.addEventListener('input', () => {
     clearTimeout(debounceTimer);
@@ -651,6 +654,75 @@ async function loadAnime() {
 }
 
 /**
+ * Setup genre filter dropdown functionality
+ */
+function setupGenreFilter() {
+  const btn = document.getElementById('genreFilterBtn');
+  const dropdown = document.getElementById('genreDropdown');
+  const clearBtn = document.getElementById('genreClearBtn');
+  const options = document.getElementById('genreOptions');
+
+  if (!btn || !dropdown) return;
+
+  // Toggle dropdown
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+      dropdown.classList.remove('open');
+    }
+  });
+
+  // Handle checkbox changes
+  options?.addEventListener('change', () => {
+    updateGenreButtonText();
+    filterAnime();
+  });
+
+  // Clear all selections
+  clearBtn?.addEventListener('click', () => {
+    const checkboxes = options.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = false);
+    updateGenreButtonText();
+    filterAnime();
+  });
+}
+
+/**
+ * Get array of selected genres
+ */
+function getSelectedGenres() {
+  const options = document.getElementById('genreOptions');
+  if (!options) return [];
+  
+  const checkboxes = options.querySelectorAll('input[type="checkbox"]:checked');
+  return Array.from(checkboxes).map(cb => cb.value);
+}
+
+/**
+ * Update genre button text to show selection count
+ */
+function updateGenreButtonText() {
+  const btn = document.getElementById('genreFilterBtn');
+  const selected = getSelectedGenres();
+  
+  if (selected.length === 0) {
+    btn.textContent = 'Genres ▼';
+    btn.classList.remove('has-selection');
+  } else if (selected.length === 1) {
+    btn.textContent = `${selected[0]} ▼`;
+    btn.classList.add('has-selection');
+  } else {
+    btn.textContent = `${selected.length} Genres ▼`;
+    btn.classList.add('has-selection');
+  }
+}
+
+/**
  * Filter and sort anime based on current filters
  */
 function filterAnime() {
@@ -660,6 +732,9 @@ function filterAnime() {
   const sortFilter = document.getElementById('sortFilter')?.value;
   const searchQuery = document.getElementById('searchInput')?.value.toLowerCase();
   const showAdult = document.getElementById('adultFilter')?.checked || false;
+  
+  // Get selected genres
+  const selectedGenres = getSelectedGenres();
 
   let filtered = [...animeCache];
 
@@ -695,6 +770,14 @@ function filterAnime() {
     filtered = filtered.filter(a => a.hasDub === true);
   } else if (dubFilter === 'subbed') {
     filtered = filtered.filter(a => !a.hasDub);
+  }
+
+  // Genre filter (anime must have ALL selected genres)
+  if (selectedGenres.length > 0) {
+    filtered = filtered.filter(a => {
+      const animeGenres = (a.genres || []).map(g => g.toLowerCase());
+      return selectedGenres.every(sg => animeGenres.includes(sg.toLowerCase()));
+    });
   }
 
   if (searchQuery) {

@@ -767,11 +767,20 @@ function createAnimeCard(anime) {
   // Combined episode progress component (includes countdown, progress, and total)
   const episodeSection = getEpisodeSection(anime);
 
+  // Get score color class
+  const getScoreClass = (s) => {
+    if (!s) return '';
+    if (s >= 80) return 'score-high';
+    if (s >= 70) return 'score-good';
+    if (s >= 50) return 'score-mid';
+    return 'score-low';
+  };
+
   return `
     <a href="./anime.html?id=${anime.id}" class="anime-card">
       <div class="card-image">
         <img src="${anime.coverImage || 'https://via.placeholder.com/200x280?text=No+Image'}" alt="${title}" loading="lazy">
-        ${score ? `<span class="card-score">⭐ ${score}%</span>` : ''}
+        ${score ? `<span class="card-score ${getScoreClass(score)}">⭐ ${score}%</span>` : ''}
         ${dubBadge}
         <span class="card-status ${statusClass}">${statusText}</span>
         ${ratingBadge}
